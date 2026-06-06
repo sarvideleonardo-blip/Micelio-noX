@@ -1,6 +1,6 @@
 # Lienzo de Dudas del Gato Araña
 
-Este repositorio contiene un prototipo visual para explorar el espacio-tiempo sin pedirle al explorador que memorice palabras difíciles. La idea principal: mover nodos con la mano, mirar cómo cambia el pulso de los relojes y dejar que Sombra acompañe sin calificar.
+Este repositorio contiene un prototipo visual para explorar el espacio-tiempo y la escritura sin pedirle al explorador que memorice palabras difíciles. La idea principal: mover nodos con la mano, mirar cómo cambia el pulso de los relojes, capturar pensamiento sin fricción y dejar que Sombra acompañe sin calificar.
 
 ## Cómo abrirlo en VS Code
 
@@ -14,6 +14,8 @@ Este repositorio contiene un prototipo visual para explorar el espacio-tiempo si
 
 - El texto grande de bienvenida está en `src/main.jsx`, dentro de la sección `intro`.
 - Los nombres visibles de los nodos están en `src/main.jsx`: `El Jalón`, `Camino`, `Reloj de mis Pies` y `Reloj de mi Cabeza`.
+- Las semillas iniciales de escritura están en `seedTexts`, al inicio de `src/main.jsx`.
+- Las palabras que detectan patrones están en `themes`, al inicio de `src/main.jsx`.
 - Los colores, tamaños, brillos y respiraciones visuales están en `src/styles.css`.
 - Los términos del `Modo Traductor` están en `translatorLabels`, al inicio de `src/main.jsx`.
 
@@ -21,12 +23,24 @@ Este repositorio contiene un prototipo visual para explorar el espacio-tiempo si
 
 Los relojes no dicen “correcto” o “incorrecto”. Solo cambian su pulso. Cuando un reloj se acerca a `El Jalón`, sus manecillas tardan más en dar la vuelta y su color se calienta. Cuando se aleja, su pulso vuelve a sentirse más ligero.
 
+## Arqueología + proyección
+
+El segundo motor convierte la escritura en campo de fuerzas:
+
+- Captura pensamientos sin obligar carpetas ni formularios largos.
+- Convierte cada texto en un nodo.
+- Detecta patrones por palabras recurrentes y temas compartidos.
+- Une nodos por relación explícita, afinidad semántica, recurrencia temática o coincidencia temporal.
+- Permite conversar con una versión pasada como brújula, no como mandato.
+- Guarda bengalas para versiones futuras.
+
 ## Para el siguiente agente en VS Code
 
 Si otro agente toma este proyecto, puede continuar por estas rutas:
 
-- Guardar posiciones de nodos para que cada viaje vuelva a abrirse donde quedó.
+- Persistir nodos y bengalas en Supabase para que cada viaje vuelva a abrirse donde quedó.
 - Convertir cada descubrimiento en una tarjeta de “Tripulante” más narrativa.
+- Añadir embeddings para que la afinidad semántica no dependa solo de palabras clave.
 - Añadir un modo “Semilla” para que el explorador escriba una duda y el lienzo proponga un nodo nuevo.
 - Conectar Supabase cuando el entorno tenga el CLI de Codex o la configuración MCP disponible.
 
