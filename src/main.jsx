@@ -12,7 +12,101 @@ const translatorLabels = {
   clock: 'dilatación temporal local',
   memory: 'grafo semántico temporal',
   future: 'recordatorio diferido consciente',
+  nuscuria: 'biblioteca relacional multimodal',
 };
+
+
+const translationModes = ['VECTOR', 'CONSTELACIÓN', 'ORGANISMO', 'MÚSICA', 'TOPOGRAFÍA', 'ADN', 'ECOSISTEMA', 'BESTIARIO', 'SUEÑO'];
+
+const translationLayers = [
+  'letras',
+  'valores',
+  'geometría',
+  'emociones',
+  'órganos',
+  'animalidad',
+  'comportamiento',
+  'color',
+  'sonido',
+  'organismo',
+];
+
+const emotionLexicon = [
+  { name: 'melancolía', color: '#364156', organ: 'Hígado melancólico', species: 'ciervo fósil', geometry: 'agujero suave' },
+  { name: 'asombro', color: '#8be9ff', organ: 'Retina ritual', species: 'pulpo conceptual', geometry: 'expansión' },
+  { name: 'ternura', color: '#ffd1dc', organ: 'Membrana de pertenencia', species: 'mamífero mineral', geometry: 'curva suave' },
+  { name: 'rechazo', color: '#7f1d1d', organ: 'Vértebras de nostalgia', species: 'reptil de borde', geometry: 'fractura' },
+  { name: 'fascinación', color: '#c084fc', organ: 'Lengua fractal', species: 'medusa radial', geometry: 'intersección luminosa' },
+];
+
+const organLibrary = [
+  { name: 'Pulmón fósil', function: 'respirar ruinas afectivas', emotion: 'melancolía', sound: 'grave poroso', geometry: 'cavidad', illness: 'ceniza inmóvil', mutation: 'branquia de carbón' },
+  { name: 'Corazón análogo', function: 'sincronizar ritmos semejantes', emotion: 'ternura', sound: 'latido impreciso', geometry: 'doble órbita', illness: 'querer volverse algoritmo', mutation: 'resonador de espejos' },
+  { name: 'Tentáculos ontológicos', function: 'palpar categorías mal cerradas', emotion: 'asombro', sound: 'grave húmedo', geometry: 'espiral ramificada', illness: 'respuesta definitiva', mutation: 'duda nueva' },
+  { name: 'Lengua fractal', function: 'probar nombres imposibles', emotion: 'fascinación', sound: 'chispa rugosa', geometry: 'bifurcación', illness: 'literalidad seca', mutation: 'alfabeto orgánico' },
+];
+
+const bestiary = [
+  {
+    name: 'Pulpo de Tentáculos Ontológicos',
+    className: 'Cefalópodo conceptual',
+    heart: 'Corazón Análogo',
+    feeding: 'Paradojas, preguntas y bordes difusos',
+    predators: 'Dogmas e identidades rígidas',
+    geometry: 'Espiral radial',
+    emotion: 'Asombro',
+    color: 'Azules profundos y negro volcánico',
+    sound: 'Grave húmedo',
+    movement: 'Exploración radial',
+    poem: 'No posee ojos. Posee preguntas. Cuando pierde una certeza, le crece otra duda.',
+  },
+  {
+    name: 'Carbón que Respira',
+    className: 'Mamífero mineral',
+    heart: 'Corazón análogo',
+    feeding: 'Ruinas afectivas y aire antiguo',
+    predators: 'Fuego literal y nostalgia rígida',
+    geometry: 'Costillas abiertas con astas',
+    emotion: 'Melancolía',
+    color: 'Negro volcánico, rojo oscuro y gris',
+    sound: 'Respiración lenta',
+    movement: 'Expansión mínima',
+    poem: 'Una criatura ósea con pulmón fósil, hueso espectral y corazón que recuerda por resonancia.',
+  },
+  {
+    name: 'Abductor Amor',
+    className: 'Organismo radial afectivo',
+    heart: 'Corazón análogo febril',
+    feeding: 'Fervor, posesión y ternura incompleta',
+    predators: 'Distancia clara',
+    geometry: 'Intersección con tentáculos luminosos',
+    emotion: 'Fascinación',
+    color: 'Magenta orbital y dorado',
+    sound: 'Coro repetido',
+    movement: 'Expansión y repetición',
+    poem: 'No secuestra cuerpos: orbita deseos hasta que parecen destino.',
+  },
+  {
+    name: 'Menos Rechazo',
+    className: 'Paisaje-criatura acuática',
+    heart: 'Membrana de pertenencia',
+    feeding: 'Aperturas pequeñas',
+    predators: 'Vergüenza cristalizada',
+    geometry: 'Curvas suaves',
+    emotion: 'Ternura',
+    color: 'Verde húmedo y azul reposado',
+    sound: 'Agua baja',
+    movement: 'Relajación y apertura',
+    poem: 'Aparece cuando una defensa aprende a respirar sin desaparecer.',
+  },
+];
+
+const characterWeb = [
+  { name: 'Renata', relations: ['Ratnah', 'pan', 'ternura', 'verde oscuro', 'espiral', 'ventana', 'Carbón que Respira', 'Menos Rechazo'] },
+  { name: 'Ratnah', relations: ['Renata', 'ausencia', 'Corazón análogo', 'laberinto', 'azul profundo'] },
+  { name: 'El Niño Amputado', relations: ['memoria', 'duelo', 'Vértebras de nostalgia', 'agujero', 'pan'] },
+  { name: 'La Cima', relations: ['asombro', 'expansión', 'Retina ritual', 'viento', 'constelación'] },
+];
 
 const themes = [
   { name: 'tiempo', words: ['tiempo', 'reloj', 'ayer', 'mañana', 'futuro', 'pasado', 'años'] },
@@ -58,6 +152,35 @@ function detectThemes(text) {
   const lowered = text.toLowerCase();
   const found = themes.filter((theme) => theme.words.some((word) => lowered.includes(word))).map((theme) => theme.name);
   return found.length ? found : ['eco libre'];
+}
+
+
+function translateNuscuria(input, mode) {
+  const normalized = input.trim() || 'CARBÓN QUE RESPIRA';
+  const letters = normalized.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ]/g, '').split('');
+  const value = letters.reduce((sum, letter) => sum + letter.codePointAt(0), 0);
+  const emotion = emotionLexicon[value % emotionLexicon.length];
+  const organ = organLibrary[(value + normalized.length) % organLibrary.length];
+  const creature = bestiary[value % bestiary.length];
+  const hue = value % 360;
+  const points = Array.from({ length: 9 }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / 9;
+    const radius = 35 + ((value + index * 13) % 28);
+    return `${50 + Math.cos(angle) * radius},${50 + Math.sin(angle) * radius}`;
+  }).join(' ');
+
+  return {
+    name: normalized,
+    value,
+    mode,
+    emotion,
+    organ,
+    creature,
+    hue,
+    points,
+    sound: `${organ.sound} · ${creature.sound}`,
+    behavior: `${creature.movement} con ${emotion.geometry}`,
+  };
 }
 
 function describePulse(closeness) {
@@ -390,6 +513,123 @@ function FutureMessages({ messages, futureDraft, setFutureDraft, futureDate, set
   );
 }
 
+
+function NuscuriaTranslator({ translated }) {
+  const [input, setInput] = useState('CARBÓN QUE RESPIRA');
+  const [mode, setMode] = useState('ORGANISMO');
+  const result = useMemo(() => translateNuscuria(input, mode), [input, mode]);
+
+  return (
+    <section className="nuscuria-shell" aria-labelledby="nuscuria-title">
+      <div className="nuscuria-hero">
+        <p className="eyebrow">NUSCURIA · Biblioteca de Traducción Expandida</p>
+        <h2 id="nuscuria-title">La app es un órgano. La biblioteca es el organismo.</h2>
+        <p>
+          No almacena palabras quietas: almacena relaciones entre textos, emociones, órganos, animales, colores, sonidos, geometrías y personajes.
+        </p>
+        {translated && <span className="translation memory-translation">{translatorLabels.nuscuria}</span>}
+      </div>
+
+      <div className="translator-lab">
+        <form className="translator-console" onSubmit={(event) => event.preventDefault()}>
+          <label htmlFor="nuscuria-input">Entrada viva</label>
+          <textarea id="nuscuria-input" value={input} onChange={(event) => setInput(event.target.value)} />
+          <div className="mode-pills" aria-label="Modos del traductor">
+            {translationModes.map((translationMode) => (
+              <button key={translationMode} className={mode === translationMode ? 'active' : ''} onClick={() => setMode(translationMode)} type="button">
+                {translationMode}
+              </button>
+            ))}
+          </div>
+        </form>
+
+        <article className="organism-output" style={{ '--creature-hue': result.hue }}>
+          <svg viewBox="0 0 100 100" role="img" aria-label={`Poema visual de ${result.name}`}>
+            <defs>
+              <radialGradient id="creatureGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="hsl(var(--creature-hue), 92%, 74%)" />
+                <stop offset="100%" stopColor="rgba(2, 6, 23, 0.1)" />
+              </radialGradient>
+            </defs>
+            <polygon points={result.points} fill="url(#creatureGlow)" className="creature-body" />
+            <circle cx="50" cy="50" r="12" className="creature-heart" />
+            {Array.from({ length: 10 }, (_, index) => (
+              <path key={index} d={`M 50 50 Q ${18 + index * 7} ${index % 2 ? 16 : 84} ${10 + index * 8} ${index % 2 ? 8 : 92}`} className="creature-tentacle" />
+            ))}
+          </svg>
+          <div>
+            <p className="eyebrow">Salida · {result.mode}</p>
+            <h3>{result.name}</h3>
+            <p>{result.creature.poem}</p>
+            <dl>
+              <div><dt>Emoción</dt><dd>{result.emotion.name}</dd></div>
+              <div><dt>Órgano</dt><dd>{result.organ.name}</dd></div>
+              <div><dt>Animalidad</dt><dd>{result.creature.className}</dd></div>
+              <div><dt>Sonido</dt><dd>{result.sound}</dd></div>
+              <div><dt>Comportamiento</dt><dd>{result.behavior}</dd></div>
+            </dl>
+          </div>
+        </article>
+      </div>
+
+      <div className="translation-layers" aria-label="Capas de traducción">
+        {translationLayers.map((layer, index) => (
+          <span key={layer}>{index + 1}. {layer}</span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BestiaryLibrary() {
+  return (
+    <section className="bestiary-shell" aria-labelledby="bestiary-title">
+      <div className="memory-heading">
+        <p className="eyebrow">Bestiario · órganos · personajes</p>
+        <h2 id="bestiary-title">Habitantes de la biblioteca viva</h2>
+        <p>Los títulos dejan de ser documentos: se vuelven especies, órganos, emociones y relaciones capaces de cruzarse.</p>
+      </div>
+      <div className="bestiary-grid">
+        {bestiary.map((creature) => (
+          <article key={creature.name} className="creature-card">
+            <p className="eyebrow">{creature.className}</p>
+            <h3>{creature.name}</h3>
+            <p>{creature.poem}</p>
+            <ul>
+              <li><strong>Órgano:</strong> {creature.heart}</li>
+              <li><strong>Alimento:</strong> {creature.feeding}</li>
+              <li><strong>Depredadores:</strong> {creature.predators}</li>
+              <li><strong>Geometría:</strong> {creature.geometry}</li>
+              <li><strong>Color:</strong> {creature.color}</li>
+            </ul>
+          </article>
+        ))}
+      </div>
+      <div className="organ-character-grid">
+        <div className="organ-list">
+          {organLibrary.map((organ) => (
+            <article key={organ.name}>
+              <h3>{organ.name}</h3>
+              <p>{organ.function}</p>
+              <span>{organ.emotion} · {organ.geometry} · {organ.mutation}</span>
+            </article>
+          ))}
+        </div>
+        <div className="character-forest">
+          {characterWeb.map((character) => (
+            <article key={character.name}>
+              <h3>{character.name}</h3>
+              <div>
+                {character.relations.map((relation) => <span key={relation}>{relation}</span>)}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const canvasRef = useRef(null);
   const size = useCanvasSize(canvasRef);
@@ -481,6 +721,9 @@ function App() {
           translated={translated}
         />
       </section>
+
+      <NuscuriaTranslator translated={translated} />
+      <BestiaryLibrary />
     </main>
   );
 }

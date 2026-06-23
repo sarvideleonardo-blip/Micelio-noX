@@ -647,3 +647,236 @@ h1 {
     min-height: auto;
   }
 }
+
+.nuscuria-shell,
+.bestiary-shell {
+  width: min(1120px, 100%);
+  margin: 1rem auto 0;
+  border: 1px solid rgba(167, 219, 255, 0.2);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(255, 231, 168, 0.12), transparent 18rem),
+    radial-gradient(circle at 88% 24%, rgba(192, 132, 252, 0.14), transparent 20rem),
+    rgba(2, 6, 23, 0.72);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34), inset 0 0 60px rgba(139, 233, 255, 0.035);
+  padding: clamp(1rem, 2.5vw, 1.4rem);
+  backdrop-filter: blur(18px);
+}
+
+.nuscuria-hero {
+  display: grid;
+  gap: 0.45rem;
+  max-width: 830px;
+}
+
+.nuscuria-hero h2,
+.bestiary-shell h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 4vw, 3.9rem);
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+}
+
+.nuscuria-hero p,
+.bestiary-shell p,
+.creature-card li,
+.organ-list span {
+  color: #dbe7ff;
+}
+
+.translator-lab {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.8fr) minmax(0, 1.2fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.translator-console,
+.organism-output {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 1rem;
+}
+
+.translator-console {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.translator-console label {
+  color: #ffe7a8;
+  font-weight: 900;
+}
+
+.translator-console textarea {
+  min-height: 150px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  color: #f8fbff;
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.9rem;
+  resize: vertical;
+}
+
+.mode-pills,
+.translation-layers,
+.character-forest article div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.mode-pills button,
+.translation-layers span,
+.character-forest span {
+  border: 1px solid rgba(139, 233, 255, 0.22);
+  border-radius: 999px;
+  color: #bcf7ff;
+  background: rgba(139, 233, 255, 0.075);
+  padding: 0.42rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.mode-pills button {
+  cursor: pointer;
+}
+
+.mode-pills button.active {
+  color: #05111d;
+  background: linear-gradient(135deg, #8be9ff, #ffe7a8);
+}
+
+.organism-output {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.62fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.organism-output svg {
+  width: 100%;
+  min-height: 260px;
+  filter: drop-shadow(0 0 32px hsla(var(--creature-hue), 90%, 66%, 0.38));
+}
+
+.creature-body {
+  opacity: 0.8;
+  transform-origin: center;
+  animation: creatureBreath 6s ease-in-out infinite;
+}
+
+.creature-heart {
+  fill: #ffe7a8;
+  filter: drop-shadow(0 0 12px #ffe7a8);
+  transform-origin: center;
+  animation: creaturePulse 2.4s ease-in-out infinite;
+}
+
+.creature-tentacle {
+  fill: none;
+  stroke: hsl(var(--creature-hue), 92%, 74%);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.58;
+}
+
+.organism-output h3,
+.creature-card h3,
+.organ-list h3,
+.character-forest h3 {
+  margin: 0;
+}
+
+.organism-output dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+}
+
+.organism-output dl div {
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.46);
+  padding: 0.62rem;
+}
+
+.organism-output dt {
+  color: #ffe7a8;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.organism-output dd {
+  margin: 0.18rem 0 0;
+  color: #f8fbff;
+}
+
+.translation-layers {
+  margin-top: 1rem;
+}
+
+.bestiary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.creature-card,
+.organ-list article,
+.character-forest article {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 1rem;
+}
+
+.creature-card ul {
+  margin: 0.8rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.creature-card strong {
+  color: #ffe7a8;
+}
+
+.organ-character-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.organ-list,
+.character-forest {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.organ-list article,
+.character-forest article {
+  display: grid;
+  gap: 0.4rem;
+}
+
+@keyframes creatureBreath {
+  0%, 100% { transform: scale(0.94) rotate(-2deg); }
+  50% { transform: scale(1.05) rotate(2deg); }
+}
+
+@keyframes creaturePulse {
+  0%, 100% { transform: scale(0.88); opacity: 0.72; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .translator-lab,
+  .organism-output,
+  .bestiary-grid,
+  .organ-character-grid {
+    grid-template-columns: 1fr;
+  }
+}
