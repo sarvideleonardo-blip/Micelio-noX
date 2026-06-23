@@ -56,6 +56,16 @@ Si otro agente toma este proyecto, puede continuar por estas rutas:
 - Añadir un modo “Semilla” para que el explorador escriba una duda y el lienzo proponga un nodo nuevo.
 - Conectar Supabase cuando el entorno tenga el CLI de Codex o la configuración MCP disponible.
 
+## Qué sigue
+
+La siguiente fase es convertir el prototipo en organismo operativo:
+
+1. Persistir relaciones en Supabase: nodos, órganos, criaturas, personajes, emociones, bengalas y conexiones.
+2. Exportar salidas de NUSCURIA: SVG, PNG, animación y eventualmente sonido.
+3. Añadir afinidad semántica profunda para encontrar patrones que atraviesan años aunque cambien de forma.
+4. Permitir mutaciones: cruzar personajes con órganos, animales, geometrías, colores y enfermedades conceptuales.
+5. Hacer que la biblioteca se navegue como bosque/ecosistema, no como carpetas.
+
 ## Supabase y MCP
 
 Ya quedó instalado el paquete de habilidades para agentes en `.agents/skills` y quedó registrado en `skills-lock.json`. En este contenedor no existe el binario `codex`, por eso el alta del servidor MCP y el login se deben repetir desde el VS Code o terminal donde sí esté instalado Codex:

@@ -101,6 +101,34 @@ const bestiary = [
   },
 ];
 
+
+const nextSteps = [
+  {
+    phase: '1 · Cimentar el organismo',
+    title: 'Guardar relaciones, no solo textos',
+    actions: ['Diseñar tablas para nodos, relaciones, órganos, criaturas y bengalas', 'Persistir cada captura del lienzo y NUSCURIA en Supabase', 'Mantener el lenguaje nativo visible antes que la jerga'],
+    output: 'Bosque relacional consultable',
+  },
+  {
+    phase: '2 · Traducir de verdad',
+    title: 'Convertir capas en materia exportable',
+    actions: ['Exportar SVG/PNG de criaturas', 'Mapear colores, temperatura, textura y sonido', 'Añadir presets para VECTOR, BESTIARIO, SUEÑO y ECOSISTEMA'],
+    output: 'Criaturas, constelaciones y poemas visuales descargables',
+  },
+  {
+    phase: '3 · Afinidad profunda',
+    title: 'Encontrar parecidos invisibles',
+    actions: ['Agregar embeddings para afinidad semántica', 'Detectar recurrencias que atraviesan años', 'Mostrar cuándo una esencia cambia de máscara'],
+    output: 'Arqueología emocional con patrones recurrentes',
+  },
+  {
+    phase: '4 · Laboratorio vivo',
+    title: 'Hacer mutar habitantes',
+    actions: ['Cruzar Renata con órganos, colores y animales', 'Crear enfermedades y mutaciones de órganos conceptuales', 'Generar ecosistemas desde relaciones, no carpetas'],
+    output: 'Bestiario emergente y biblioteca-jardín',
+  },
+];
+
 const characterWeb = [
   { name: 'Renata', relations: ['Ratnah', 'pan', 'ternura', 'verde oscuro', 'espiral', 'ventana', 'Carbón que Respira', 'Menos Rechazo'] },
   { name: 'Ratnah', relations: ['Renata', 'ausencia', 'Corazón análogo', 'laberinto', 'azul profundo'] },
@@ -630,6 +658,34 @@ function BestiaryLibrary() {
   );
 }
 
+
+function NextStepsPanel() {
+  return (
+    <section className="next-steps-shell" aria-labelledby="next-steps-title">
+      <div className="next-steps-heading">
+        <p className="eyebrow">Qué sigue</p>
+        <h2 id="next-steps-title">De prototipo a organismo vivo</h2>
+        <p>
+          La ruta no es agregar más pantallas por acumular. La ruta es darle sistema nervioso: persistencia, traducciones exportables,
+          afinidades profundas y mutaciones entre habitantes.
+        </p>
+      </div>
+      <div className="next-steps-grid">
+        {nextSteps.map((step) => (
+          <article key={step.phase}>
+            <span>{step.phase}</span>
+            <h3>{step.title}</h3>
+            <ul>
+              {step.actions.map((action) => <li key={action}>{action}</li>)}
+            </ul>
+            <strong>{step.output}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const canvasRef = useRef(null);
   const size = useCanvasSize(canvasRef);
@@ -724,6 +780,7 @@ function App() {
 
       <NuscuriaTranslator translated={translated} />
       <BestiaryLibrary />
+      <NextStepsPanel />
     </main>
   );
 }
