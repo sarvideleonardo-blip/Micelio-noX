@@ -10,6 +10,32 @@ Este repositorio contiene un prototipo visual para explorar el espacio-tiempo, l
 4. Ejecuta `npm run dev`.
 5. Abre el enlace que muestra Vite, normalmente `http://localhost:5173`.
 
+## Cómo verlo funcionar ahora
+
+Desde la raíz del repositorio:
+
+```bash
+npm install
+npm run dev
+```
+
+Luego abre el enlace que imprime Vite, normalmente `http://localhost:5173`. Si estás dentro de VS Code, también puedes abrir la terminal integrada y ejecutar `npm start`, que hace lo mismo que `npm run dev`.
+
+Prueba rápida dentro de la app:
+
+1. Arrastra `El Jalón` cerca de un reloj: su pulso debe ponerse más lento.
+2. Activa `Modo Traductor`: aparecen los nombres técnicos sin reemplazar el lenguaje intuitivo.
+3. Escribe una frase en `Captura sin fricción` y presiona `Volverlo nodo`: aparece como nodo del campo de escritura.
+4. Baja a `NUSCURIA`, cambia el texto `CARBÓN QUE RESPIRA` o cambia el modo: el organismo SVG cambia de forma/color/datos.
+5. Revisa `Qué sigue`: ahí está la ruta para convertir el prototipo en organismo con persistencia, exportación y mutaciones.
+
+Para revisar una versión de producción local:
+
+```bash
+npm run build
+npm run preview
+```
+
 ## Qué se puede tocar sin saber programar
 
 - El texto grande de bienvenida está en `src/main.jsx`, dentro de la sección `intro`.
