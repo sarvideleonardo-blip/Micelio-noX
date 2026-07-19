@@ -1,0 +1,1712 @@
+═══════════════════════════════════════════════════════════════════════════════
+  nOOxcuro Pipeline v3.0 — BACKUP COMPLETO
+  Fecha: 2026-07-19
+  Estructura: 01_project / 02_logs_ia / 03_nodes (thoughts/doubts/ideas/conversations)
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTE ARCHIVO CONTIENE TODO EL CODIGO FUENTE DE LOS 20 ARCHIVOS DEL PROYECTO.
+Para restaurar: copia cada seccion entre los delimitadores ====== en un archivo
+con el nombre indicado en el encabezado.
+
+═══════════════════════════════════════════════════════════════════════════════
+CONTENIDO:
+   1. README.md (2591 bytes)
+   2. agent_board.py (5710 bytes)
+   3. agent_classifier.py (4094 bytes)
+   4. agent_cosmogonia.py (2514 bytes)
+   5. agent_escritura.py (1240 bytes)
+   6. agent_identidad.py (4232 bytes)
+   7. agent_leyes.py (1219 bytes)
+   8. agent_metodo.py (1244 bytes)
+   9. agent_museo.py (1282 bytes)
+  10. agent_parser.py (3266 bytes)
+  11. agents.py (895 bytes)
+  12. arquitecto.py (3371 bytes)
+  13. config.json (188 bytes)
+  14. install.sh (1693 bytes)
+  15. run.sh (277 bytes)
+  16. step_classifier.py (2161 bytes)
+  17. step_enrich.py (2243 bytes)
+  18. step_parser.py (2920 bytes)
+  19. step_writer.py (4926 bytes)
+  20. sync.sh (1432 bytes)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: README.md
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+# nOOxcuro Pipeline v3.0 — Estructura Final
+
+## Que es
+
+Pipeline que transforma notas de Apple Notes (o archivos .txt) en notas estructuradas de Obsidian, organizadas en la estructura definitiva del protocolo.
+
+## Estructura de salida
+
+```
+nOOxcuro/
+├── 01_project/
+├── 02_logs_ia/
+└── 03_nodes/
+    ├── thoughts/      ← Cosmogonia, Identidad
+    ├── doubts/        ← Leyes
+    ├── ideas/         ← Metodo, Museo
+    └── conversations/ ← Escritura
+```
+
+## Archivos
+
+| Archivo | Que hace |
+|---------|----------|
+| `arquitecto.py` | Importer: saca notas de Apple Notes (SQLite) → staging/ |
+| `step_parser.py` | Paso 1: lee .txt de staging, publica en tablero |
+| `step_classifier.py` | Paso 2: clasifica en 6 categorias |
+| `step_enrich.py` | Paso 3: enriquece con agente especializado |
+| `step_writer.py` | Paso 4: escribe .md en 03_nodes/<subcarpeta>/ |
+| `agent_parser.py` | Limpia texto, extrae hechos, resumen, citas |
+| `agent_classifier.py` | Clasifica: Metodo/Cosmogonia/Museo/Escritura/Identidad/Leyes |
+| `agent_*.py` (6) | Agentes especializados por categoria |
+| `agent_board.py` | Tablero de mensajes async (markdown) |
+| `agents.py` | Registro de agentes + mapeo a 03_nodes/ |
+| `config.json` | Configuracion central |
+| `sync.sh` | **Comando unico**: importer + pipeline completo |
+| `run.sh` | Solo pipeline (si staging ya tiene .txt) |
+| `install.sh` | Instalador: crea carpetas, configura paths |
+
+## Instalacion
+
+```bash
+bash install.sh "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/nOOxcuro"
+```
+
+## Uso diario
+
+```bash
+# Todo en uno: Apple Notes → Obsidian
+bash sync.sh
+
+# O solo pipeline (si ya tienes .txt en staging/)
+bash run.sh
+```
+
+## Mapeo de categorias
+
+| Categoria | 03_nodes/ |
+|-----------|-----------|
+| Cosmogonia | thoughts |
+| Identidad | thoughts |
+| Museo | ideas |
+| Escritura | conversations |
+| Metodo | ideas |
+| Leyes | doubts |
+
+## Requisitos
+
+- Python 3.8+
+- `html2text` (solo para importer): `pip3 install html2text`
+- Todo lo demas es libreria estandar
+
+## Flujo
+
+```
+Apple Notes ──► arquitecto.py ──► staging/*.txt
+                                      │
+staging/*.txt ──► step_parser ──► tablero ──► step_classifier ──► step_enrich ──► step_writer
+                                                                                    │
+                                                                                    ▼
+                                                                           03_nodes/<subcarpeta>/*.md
+```
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_board.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Tablero asincrónico de mensajes entre agentes (Meta/agent-messages.md).
+
+Cada paso del pipeline (parser, classifier, enrich, writer) es independiente:
+lee los mensajes 'pendiente' dirigidos a su step, los procesa, y publica un
+mensaje nuevo para el siguiente step. No hay llamada directa entre pasos:
+toda la coordinación pasa por este archivo markdown, que Cline (o cualquier
+proceso) puede leer y escribir.
+
+Formato de cada mensaje en el archivo:
+
+    ## MSG-<id de 8 hex>
+    - status: pendiente | en_proceso | completado | error
+    - step: paso que debe CONSUMIR el mensaje (parser, classifier, enrich, writer)
+    - note_ref: identificador de la nota/captura relacionada
+    - created_at: timestamp ISO
+    - updated_at: timestamp ISO
+
+    ```json
+    { ... payload para ese paso ... }
+    ```
+
+LIMITACIÓN CONOCIDA: no hay locking real. Si dos procesos escriben al mismo
+tiempo sobre el mismo archivo, gana el último en escribir (last-write-wins).
+Para uso personal / no concurrente esto es aceptable. Si se vuelve un
+problema, agregar un lockfile simple (crear .lock, esperar, borrar) antes
+de _write_board.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import uuid
+from datetime import datetime
+
+HEADER_RE = re.compile(r'^## MSG-([a-f0-9]{8})\s*$')
+FIELD_RE = re.compile(r'^- (\w+):\s?(.*)$')
+
+BOARD_TEMPLATE = """# Tablero de Mensajes entre Agentes — noXcuro
+
+<!--
+Cada mensaje es un bloque "## MSG-<id>" con campos "- clave: valor"
+(status, step, note_ref, created_at, updated_at) y un payload ```json.
+status: pendiente | en_proceso | completado | error
+step: paso que debe CONSUMIR el mensaje (parser, classifier, enrich, writer)
+Cada script de paso (step_*.py) lee los 'pendiente' de su step, los procesa,
+marca completado/error, y publica un mensaje nuevo para el siguiente step.
+-->
+"""
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _ensure_board(path: str) -> None:
+    if not os.path.exists(path):
+        folder = os.path.dirname(path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(BOARD_TEMPLATE)
+
+
+def read_board(path: str) -> list[dict]:
+    """Lee y parsea todos los mensajes del tablero."""
+    _ensure_board(path)
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    messages: list[dict] = []
+    blocks = re.split(r'\n(?=## MSG-)', content)
+    for block in blocks:
+        stripped = block.strip()
+        if not stripped.startswith("## MSG-"):
+            continue
+        header_match = HEADER_RE.match(stripped.splitlines()[0])
+        if not header_match:
+            continue
+        msg_id = header_match.group(1)
+        fields: dict = {"id": msg_id}
+        payload: dict = {}
+        json_match = re.search(r'```json\s*\n(.*?)\n```', block, flags=re.DOTALL)
+        if json_match:
+            try:
+                payload = json.loads(json_match.group(1))
+            except json.JSONDecodeError:
+                payload = {}
+        for line in block.splitlines():
+            fm = FIELD_RE.match(line)
+            if fm:
+                fields[fm.group(1)] = fm.group(2)
+        fields["payload"] = payload
+        messages.append(fields)
+    return messages
+
+
+def _render_message(msg: dict) -> str:
+    lines = [f"## MSG-{msg['id']}"]
+    for key in ("status", "step", "note_ref", "created_at", "updated_at"):
+        lines.append(f"- {key}: {msg.get(key, '')}")
+    lines.append("")
+    lines.append("```json")
+    lines.append(json.dumps(msg.get("payload", {}), ensure_ascii=False, indent=2))
+    lines.append("```")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _write_board(path: str, messages: list[dict]) -> None:
+    body = "\n".join(_render_message(m) for m in messages)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(BOARD_TEMPLATE + "\n" + body)
+
+
+def post_message(path: str, step: str, note_ref: str, payload: dict, status: str = "pendiente") -> str:
+    """Publica un mensaje nuevo en el tablero. Devuelve el id del mensaje."""
+    messages = read_board(path)
+    now = _now_iso()
+    msg_id = uuid.uuid4().hex[:8]
+    messages.append({
+        "id": msg_id,
+        "status": status,
+        "step": step,
+        "note_ref": note_ref,
+        "created_at": now,
+        "updated_at": now,
+        "payload": payload,
+    })
+    _write_board(path, messages)
+    return msg_id
+
+
+def get_pending(path: str, step: str) -> list[dict]:
+    """Mensajes con status=pendiente dirigidos a `step`."""
+    return [m for m in read_board(path) if m.get("step") == step and m.get("status") == "pendiente"]
+
+
+def mark_status(path: str, msg_id: str, status: str, extra_payload: dict | None = None) -> None:
+    """Actualiza el status de un mensaje (y opcionalmente fusiona datos en su payload)."""
+    messages = read_board(path)
+    now = _now_iso()
+    for m in messages:
+        if m["id"] == msg_id:
+            m["status"] = status
+            m["updated_at"] = now
+            if extra_payload:
+                m["payload"].update(extra_payload)
+            break
+    _write_board(path, messages)
+
+
+if __name__ == "__main__":
+    demo_path = "/tmp/agent-messages-demo.md"
+    if os.path.exists(demo_path):
+        os.remove(demo_path)
+    mid = post_message(demo_path, step="classifier", note_ref="demo-1", payload={"parsed_text": "hola"})
+    print("Publicado:", mid)
+    print("Pendientes para classifier:", get_pending(demo_path, "classifier"))
+    mark_status(demo_path, mid, "completado")
+    print("Pendientes tras marcar completado:", get_pending(demo_path, "classifier"))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_classifier.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Clasificador: decide categoría y extrae metadatos desde el texto."""
+
+from __future__ import annotations
+
+import json
+import re
+from agent_parser import clean_text
+
+
+def _word_in_text(word: str, lower_text: str) -> bool:
+    """Busca `word` como palabra completa (o frase completa) en el texto,
+    no como subcadena. Evita falsos positivos como 'ser' dentro de
+    'observa', o 'yo' dentro de 'mayor'."""
+    pattern = r'\b' + re.escape(word) + r'\b'
+    return re.search(pattern, lower_text) is not None
+
+
+CATEGORIES = ["Metodo", "Cosmogonia", "Museo", "Escritura", "Identidad", "Leyes"]
+
+DEFAULT_KEYWORDS = {
+    "Metodo": [
+        "paso",
+        "proceso",
+        "procedimiento",
+        "guia",
+        "metodo",
+        "iteracion",
+        "iterar",
+        "objetivo",
+        "protocolo",
+    ],
+    "Cosmogonia": [
+        "origen",
+        "universo",
+        "cosmos",
+        "creacion",
+        "dios",
+        "caos",
+        "principio",
+        "generacion",
+        "mito",
+    ],
+    "Museo": [
+        "museo",
+        "exposicion",
+        "coleccion",
+        "obra",
+        "artista",
+        "galeria",
+        "curador",
+        "instalacion",
+        "patrimonio",
+    ],
+    "Escritura": [
+        "escribir",
+        "narrativa",
+        "cuento",
+        "poema",
+        "estilo",
+        "redaccion",
+        "personaje",
+        "estructura",
+        "genero",
+    ],
+    "Identidad": [
+        "identidad",
+        "yo",
+        "ser",
+        "persona",
+        "historia personal",
+        "autobiografia",
+        "crecimiento",
+        "experiencia",
+        "valores",
+    ],
+    "Leyes": [
+        "ley",
+        "norma",
+        "codigo",
+        "juridico",
+        "legal",
+        "sentencia",
+        "regulacion",
+        "derecho",
+        "obligacion",
+    ],
+}
+
+
+learned_keywords: dict[str, list[str]] = {k: list(v) for k, v in DEFAULT_KEYWORDS.items()}
+
+
+def _autoeval_suggested_category(text: str) -> str | None:
+    match = re.search(r"sugiero categoria:\s*([A-Za-z]+)", text, flags=re.IGNORECASE)
+    if match:
+        candidate = match.group(1).capitalize()
+        return candidate if candidate in CATEGORIES else None
+    return None
+
+
+def _boost_from_autoeval(text: str, scores: dict[str, int], config_boost: int = 3):
+    suggested = _autoeval_suggested_category(text)
+    if suggested and suggested in scores:
+        scores[suggested] += config_boost
+    return scores
+
+
+def _score(text: str) -> dict[str, int]:
+    cleaned = clean_text(text)
+    lower = cleaned.lower()
+    scores = {category: 0 for category in CATEGORIES}
+
+    for category, keywords in learned_keywords.items():
+        for word in keywords:
+            if _word_in_text(word, lower):
+                scores[category] += 2
+    scores = _boost_from_autoeval(text, scores)
+    return scores
+
+
+def classify(text: str) -> dict:
+    scores = _score(text)
+    category = max(scores, key=scores.get)
+    if scores[category] == 0:
+        category = "Metodo"
+
+    lower = clean_text(text).lower()
+    tags = [word for word in lower.replace("\n", " ").split(" ") if len(word) > 4][:5]
+
+    return {
+        "category": category,
+        "tags": tags,
+        "scores": scores,
+        "stage_cognitive": "captura",
+    }
+
+
+def suggest_improvements(text: str) -> dict:
+    scores = _score(text)
+    category = max(scores, key=scores.get)
+    suggestions = []
+    if scores[category] <= 2:
+        suggestions.append(
+            "La clasificación actual es débil; podés agregar una línea tipo: "
+            "`sugiero categoria: <Metodo|Cosmogonia|Museo|Escritura|Identidad|Leyes>`."
+        )
+    if "sugiero categoria:" in text.lower():
+        suggestions.append("Se detectó una sugerencia; el clasificador la usa para priorizar esa categoría.")
+    return {
+        "category": category,
+        "suggestions": suggestions,
+        "scores": scores,
+    }
+
+
+if __name__ == "__main__":
+    sample = "Guia paso a paso del proceso creativo."
+    print(json.dumps(classify(sample), ensure_ascii=False, indent=2))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_cosmogonia.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from __future__ import annotations
+
+"""Agente especializado en categoría Cosmogonia."""
+import re
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+PREGUNTAS_BASE = [
+    "¿Qué había antes del principio que describe esta idea?",
+    "¿Esta cosmogonía explica un origen o justifica un orden actual?",
+]
+
+SIMBOLOS_CLAVE = [
+    "Árbol Invertido",
+    "Rayo Rosa",
+    "Murciélago Rosa",
+    "Calcetín Verde",
+    "Nave de Preguntas",
+    "Guardián de Plumas Metálicas",
+]
+
+
+def _extract_symbols(text: str) -> list[str]:
+    """Extrae símbolos clave de la mitología personal."""
+    found_symbols = []
+    lower_text = text.lower()
+    for symbol in SIMBOLOS_CLAVE:
+        # Busca el símbolo como palabra completa, ignorando mayúsculas/minúsculas
+        if re.search(r'\b' + re.escape(symbol.lower()) + r'\b', lower_text):
+            found_symbols.append(symbol)
+    return list(dict.fromkeys(found_symbols)) # Elimina duplicados
+
+
+def enrich(text: str) -> dict:
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    
+    symbols = _extract_symbols(cleaned)
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE
+    if len(symbols) > 1:
+        preguntas.append(f"¿Cómo interactúa el '{symbols[0]}' con el '{symbols[1]}', si es que lo hacen?")
+    elif len(symbols) == 1:
+        preguntas.append(f"¿Cuál es el rol fundamental del '{symbols[0]}' en esta mitología?")
+
+    title = make_title(resumen, "Nota de cosmogonía")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "cosmogonia",
+        "relations_explicit": symbols,
+        "relations_semantic": ["mitologia-personal", "simbolismo"],
+        "recurrence_topics": ["origen", "incertidumbre", "transformacion"],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    import json
+    sample = """
+    BITÁCORA DE UN COSMONAUTA DE LA INCERTIDUMBRE
+    Todo comenzó con el Árbol Invertido y un Rayo Rosa.
+    Mi guía es un Murciélago Rosa y mi motor un Calcetín Verde.
+    """
+    enriched_data = enrich(sample)
+    print(json.dumps(enriched_data, ensure_ascii=False, indent=2))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_escritura.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Agente especializado en categoría Escritura."""
+
+from __future__ import annotations
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+PREGUNTAS_BASE = [
+    "¿Desde qué voz o punto de vista se está contando esto?",
+    "¿Qué pasaría si este fragmento se contara al revés?",
+]
+
+
+def enrich(text: str) -> dict:
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE[:1]
+    title = make_title(resumen, "Nota de escritura")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "escritura",
+        "relations_explicit": [],
+        "relations_semantic": [],
+        "recurrence_topics": [],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    print(enrich("Narrativa en primera persona: 'no recuerdo cuándo empezó todo esto'."))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_identidad.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from __future__ import annotations
+
+"""Agente especializado en categoría Identidad."""
+import os
+from datetime import datetime
+import re
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+AGENT_NAME = "identidad"
+STATE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "Meta", "states"))
+
+PREGUNTAS_BASE = [
+    "¿Esta idea describe quién sos ahora o quién dejaste de ser?",
+    "¿Qué versión anterior tuya estaría en desacuerdo con esto?",
+    "¿Qué evento o persona fue el catalizador de esta transformación?",
+]
+
+
+def _write_postit(notes: str):
+    """Escribe las notas de estado del agente (protocolo Post-it)."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    filepath = os.path.join(STATE_DIR, f"{AGENT_NAME}.md")
+    now = datetime.utcnow().isoformat()
+    content = f"""---
+agent: {AGENT_NAME}
+last-run: "{now}"
+---
+
+## Post-it
+
+{notes[:1000]}
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def _read_postit() -> str:
+    """Lee las notas de estado del agente."""
+    filepath = os.path.join(STATE_DIR, f"{AGENT_NAME}.md")
+    return open(filepath).read() if os.path.exists(filepath) else "Sin estado previo."
+
+def _extract_entities(text: str) -> list[str]:
+    """Extrae entidades mencionadas en mayúsculas o entre paréntesis."""
+    # Busca (Vivencial - Entidad)
+    vivencial = re.findall(r"\((?:Vivencial|Teorías) - ([\w\s]+)\)", text, re.IGNORECASE)
+    # Busca entidades en mayúsculas que no sean acrónimos cortos.
+    mayusculas = re.findall(r"\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}(?:\s[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)\b", text)
+    
+    entities = [e.strip() for e in vivencial + mayusculas]
+    # Filtra duplicados y entidades comunes que no aportan valor
+    unique_entities = list(dict.fromkeys(entities))
+    return [e for e in unique_entities if e.lower() not in ["teorema", "postulado", "leyes", "el", "la", "los", "las", "un", "una"]]
+
+
+def _extract_theorems(text: str) -> list[str]:
+    """Extrae los nombres de los teoremas o leyes personales."""
+    theorems = re.findall(r"TEOREMA\s[\w\d]+:\s?(.*?)\s*\(", text, re.IGNORECASE)
+    postulados = re.findall(r"Postulado de la (.*?):", text, re.IGNORECASE)
+    return [t.strip() for t in theorems + postulados]
+
+
+def enrich(text: str) -> dict:
+    # Leer estado anterior al inicio de la ejecución
+    last_state = _read_postit()
+
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    
+    # Lógica mejorada
+    entities = _extract_entities(cleaned)
+    theorems = _extract_theorems(cleaned)
+    
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE
+    if theorems:
+        preguntas.append(f"¿Cómo se manifiesta el '{theorems[0]}' en tu día a día?")
+
+    # Escribir nuevo estado al final de la ejecución
+    postit_notes = f"""- Último texto procesado: "{core}..."
+- Entidades extraídas: {len(entities)}
+- Teoremas extraídos: {len(theorems)}
+"""
+    _write_postit(postit_notes)
+    title = make_title(resumen, "Nota de identidad")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "identidad",
+        "relations_explicit": entities, # Ahora poblamos esto
+        "relations_semantic": theorems, # Usamos este campo para los teoremas
+        "recurrence_topics": ["identidad", "relaciones", "fisica-cuantica"],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    import json
+
+    # --- Demo con texto inline ---
+    sample = "TEOREMA Alfa: La identidad es un proceso, no un estado. (Vivencial - Yo). Postulado de la dualidad: dos verdades coexisten."
+    enriched_data = enrich(sample)
+    print(json.dumps(enriched_data, ensure_ascii=False, indent=2))
+    print("\nEntidades extraídas:", enriched_data.get("relations_explicit"))
+    print("Teoremas extraídos:", enriched_data.get("relations_semantic"))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_leyes.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Agente especializado en categoría Leyes."""
+
+from __future__ import annotations
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+PREGUNTAS_BASE = [
+    "¿Qué caso límite dejaría esta norma sin cubrir?",
+    "¿A quién beneficia esta regla y a quién deja afuera?",
+]
+
+
+def enrich(text: str) -> dict:
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE[:1]
+    title = make_title(resumen, "Nota de leyes")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "leyes",
+        "relations_explicit": [],
+        "relations_semantic": [],
+        "recurrence_topics": [],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    print(enrich("Artículo 12: la norma establece 3 excepciones al régimen general."))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_metodo.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Agente especializado en categoría Metodo."""
+
+from __future__ import annotations
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+PREGUNTAS_BASE = [
+    "¿Qué paso de este proceso es el más frágil o menos probado?",
+    "¿Qué pasaría si se invirtiera el orden de los pasos?",
+]
+
+
+def enrich(text: str) -> dict:
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE[:1]
+    title = make_title(resumen, "Nota de método")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "metodo",
+        "relations_explicit": [],
+        "relations_semantic": [],
+        "recurrence_topics": [],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    print(enrich("Paso 1: definir objetivo. Paso 2: iterar. En 3 días se revisa el resultado."))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_museo.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Agente especializado en categoría Museo."""
+
+from __future__ import annotations
+
+from agent_parser import (
+    clean_text,
+    extract_resumen,
+    extract_citas,
+    extract_preguntas_detectadas,
+    make_title,
+)
+
+PREGUNTAS_BASE = [
+    "¿En qué sala del museo (no por disciplina, por obsesión) encajaría esta pieza?",
+    "¿Qué obsesión revela esta obra/colección que no es evidente a primera vista?",
+]
+
+
+def enrich(text: str) -> dict:
+    cleaned = clean_text(text)
+    core = cleaned[:120].replace("\n", " ")
+    resumen = extract_resumen(cleaned)
+    citas = extract_citas(cleaned)
+    preguntas = extract_preguntas_detectadas(cleaned) or PREGUNTAS_BASE[:1]
+    title = make_title(resumen, "Nota de museo")
+    return {
+        "core_nucleus": core,
+        "stage_cognitive": "museo",
+        "relations_explicit": [],
+        "relations_semantic": [],
+        "recurrence_topics": [],
+        "future_letter": {"enabled": False, "review_on": None},
+        "title": title,
+        "body": cleaned,
+        "resumen": resumen,
+        "citas": citas,
+        "preguntas": preguntas,
+    }
+
+
+if __name__ == "__main__":
+    print(enrich("La exposición contemporánea reunió 40 obras del artista en la galería."))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agent_parser.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Agente parser: normaliza texto y extrae hechos para clasificación.
+
+Incluye además helpers de análisis de texto (resumen, citas, preguntas)
+compartidos por los agentes especializados de categoría, para que
+el "modo local" haga algo más que devolver un título fijo.
+"""
+
+from __future__ import annotations
+
+import re
+import unicodedata
+
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
+_QUOTE_RE = re.compile(r'["“”\'«»].{3,}?["“”\'«»]')
+_NUMBER_RE = re.compile(r'\d')
+
+
+def strip_accents(value: str) -> str:
+    return unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+
+
+def clean_text(value: str) -> str:
+    text = value.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    return "\n".join(lines).strip()
+
+
+def extract_facts(value: str) -> dict:
+    text = clean_text(value)
+    mentions = re.findall(r"\[\[([^\[\]]+)\]\]", text)
+    return {
+        "parsed_text": text,
+        "length_chars": len(text),
+        "lines": sum(1 for chunk in text.splitlines() if chunk.strip()),
+        "mentions": list(dict.fromkeys(mentions)),
+    }
+
+
+def split_sentences(text: str) -> list[str]:
+    """Divide el texto en oraciones (heurística simple, sin NLP)."""
+    text = text.strip()
+    if not text:
+        return []
+    parts = _SENTENCE_SPLIT_RE.split(text.replace("\n", " "))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def extract_resumen(text: str, max_chars: int = 240) -> str:
+    """Resumen ejecutivo: primera(s) oración(es) hasta un mínimo razonable."""
+    sentences = split_sentences(text)
+    if not sentences:
+        return ""
+    resumen = sentences[0]
+    i = 1
+    while len(resumen) < 80 and i < len(sentences):
+        resumen += " " + sentences[i]
+        i += 1
+    if len(resumen) > max_chars:
+        resumen = resumen[:max_chars].rstrip() + "…"
+    return resumen
+
+
+def extract_citas(text: str, max_citas: int = 3) -> list[str]:
+    """Extrae oraciones "citables": entre comillas, o con datos concretos
+    (números, fechas, cifras). Heurística, no NLP real."""
+    sentences = split_sentences(text)
+    citas: list[str] = []
+    for s in sentences:
+        if _QUOTE_RE.search(s):
+            citas.append(s)
+        elif _NUMBER_RE.search(s) and len(s) < 220:
+            citas.append(s)
+        if len(citas) >= max_citas:
+            break
+    return citas
+
+
+def extract_preguntas_detectadas(text: str) -> list[str]:
+    """Preguntas que ya estaban escritas en el texto original."""
+    sentences = split_sentences(text)
+    return [s for s in sentences if s.endswith("?")]
+
+
+def make_title(resumen: str, fallback: str, max_chars: int = 60) -> str:
+    """Genera un título corto a partir del resumen, o usa un fallback."""
+    source = (resumen or "").strip() or fallback
+    source = source.strip(" .")
+    if not source:
+        return fallback
+    if len(source) > max_chars:
+        return source[:max_chars].rstrip() + "…"
+    return source
+
+
+if __name__ == "__main__":
+    sample = "Hola [[Obsidian]], esto es una nota.\n\nCon doble salto."
+    print(extract_facts(sample))
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: agents.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Registro de agentes especializados."""
+
+from __future__ import annotations
+
+from agent_metodo import enrich as enrich_metodo
+from agent_cosmogonia import enrich as enrich_cosmogonia
+from agent_museo import enrich as enrich_museo
+from agent_escritura import enrich as enrich_escritura
+from agent_identidad import enrich as enrich_identidad
+from agent_leyes import enrich as enrich_leyes
+
+AGENTS: dict[str, callable] = {
+    "Metodo": enrich_metodo,
+    "Cosmogonia": enrich_cosmogonia,
+    "Museo": enrich_museo,
+    "Escritura": enrich_escritura,
+    "Identidad": enrich_identidad,
+    "Leyes": enrich_leyes,
+}
+
+# Mapeo a estructura 03_nodes/
+CATEGORY_TO_FOLDER: dict[str, str] = {
+    "Cosmogonia": "thoughts",
+    "Identidad": "thoughts",
+    "Museo": "ideas",
+    "Escritura": "conversations",
+    "Metodo": "ideas",
+    "Leyes": "doubts",
+}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: arquitecto.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Arquitecto v2.1: Importer de Apple Notes para noXcuro.
+
+Saca notas de Apple Notes (SQLite) y las guarda como .txt en staging/.
+El pipeline (step_parser + step_classifier + step_enrich + step_writer)
+procesa esos .txt y genera las notas .md en 03_nodes/.
+
+Uso:
+    python3 arquitecto.py --minutos 60
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sqlite3
+import sys
+from datetime import datetime, timedelta
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+
+try:
+    import html2text
+    HAS_HTML2TEXT = True
+except ImportError:
+    HAS_HTML2TEXT = False
+
+
+def _create_temp_file(content: str) -> str:
+    staging_dir = os.path.join(SCRIPT_DIR, "staging")
+    os.makedirs(staging_dir, exist_ok=True)
+    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    safe = "".join(c for c in content[:40] if c.isalnum() or c in " -_").strip().replace(" ", "-")
+    filename = f"apple_note_{ts}_{safe}.txt"
+    filepath = os.path.join(staging_dir, filename)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+    return filepath
+
+
+def run_importer(minutes: int):
+    print(f"--- INICIANDO IMPORTADOR DE APPLE NOTES ---")
+    print(f"Buscando notas modificadas en los ultimos {minutes} minutos...\n")
+
+    if not HAS_HTML2TEXT:
+        print("ERROR: html2text no esta instalado.")
+        print("Instalalo con: pip3 install html2text")
+        return
+
+    db_path = os.path.expanduser("~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite")
+    if not os.path.exists(db_path):
+        print(f"ERROR: No se encontro la base de datos de Apple Notes en:")
+        print(f"   {db_path}")
+        return
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        time_threshold = (datetime.utcnow() - timedelta(minutes=minutes) - datetime(2001, 1, 1)).total_seconds()
+
+        query = """
+        SELECT n.ZTITLE, b.ZHTMLSTRING
+        FROM ZICNOTEDATA AS n
+        JOIN ZICNOTEBODY AS b ON n.ZBODY = b.Z_PK
+        WHERE n.ZMODIFICATIONDATE1 >= ? AND n.ZTRASHED = 0
+        ORDER BY n.ZMODIFICATIONDATE1 DESC
+        """
+
+        cursor.execute(query, (time_threshold,))
+        notes = cursor.fetchall()
+        conn.close()
+
+        if not notes:
+            print("No se encontraron notas nuevas.")
+            return
+
+        print(f"Se encontraron {len(notes)} notas.\n")
+        h = html2text.HTML2Text()
+        h.body_width = 0
+
+        for i, (title, html_body) in enumerate(notes):
+            print(f"  [{i+1}/{len(notes)}] {title or 'Sin titulo'}")
+            markdown_body = h.handle(html_body or "")
+            full_content = f"# {title}\n\n{markdown_body}" if title else markdown_body
+            temp_file = _create_temp_file(full_content)
+
+        print(f"\n--- IMPORTACION COMPLETADA ---")
+        print(f"{len(notes)} notas guardadas en staging/")
+        print(f"Corre ahora: bash run.sh")
+
+    except Exception as e:
+        print(f"ERROR durante la importacion: {e}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Importer de Apple Notes para noXcuro")
+    parser.add_argument("--minutos", type=int, default=60, help="Minutos hacia atras para buscar notas")
+    args = parser.parse_args()
+    run_importer(args.minutos)
+
+
+if __name__ == "__main__":
+    main()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: config.json
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+{
+  "vault_path": "/tmp/nOOxcuro_test_yl5t2ksx",
+  "board_file": "Meta/agent-messages.md",
+  "nodes_folder": "03_nodes",
+  "staging_folder": "staging",
+  "processed_folder": "procesadas"
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: install.sh
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env bash
+set -e
+
+VAULT="${1}"
+if [ -z "$VAULT" ]; then
+    echo "ERROR: falta ruta al vault"
+    echo "Uso: bash install.sh RUTA_VAULT"
+    exit 1
+fi
+
+VAULT="$(cd "$(dirname "$VAULT")" && pwd)/$(basename "$VAULT")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Vault: $VAULT"
+echo "Scripts: $SCRIPT_DIR"
+
+mkdir -p "$VAULT/Meta"
+mkdir -p "$VAULT/03_nodes/thoughts"
+mkdir -p "$VAULT/03_nodes/doubts"
+mkdir -p "$VAULT/03_nodes/ideas"
+mkdir -p "$VAULT/03_nodes/conversations"
+mkdir -p "$VAULT/staging"
+mkdir -p "$VAULT/staging/procesadas"
+
+cat > "$SCRIPT_DIR/config.json" << EOF
+{
+  "vault_path": "VAULT_PATH_PLACEHOLDER",
+  "board_file": "Meta/agent-messages.md",
+  "nodes_folder": "03_nodes",
+  "staging_folder": "staging",
+  "processed_folder": "procesadas"
+}
+EOF
+
+ESCAPED_VAULT="${VAULT//\\/\\\\}"
+sed -i '' "s|VAULT_PATH_PLACEHOLDER|$ESCAPED_VAULT|g" "$SCRIPT_DIR/config.json" 2>/dev/null || sed -i "s|VAULT_PATH_PLACEHOLDER|$ESCAPED_VAULT|g" "$SCRIPT_DIR/config.json"
+
+BOARD="$VAULT/Meta/agent-messages.md"
+if [ ! -f "$BOARD" ]; then
+    echo "# Tablero de Mensajes entre Agentes — nOOxcuro" > "$BOARD"
+    echo "Tablero creado"
+fi
+
+echo ""
+echo "Verificando imports..."
+cd "$SCRIPT_DIR"
+python3 -c "from agents import AGENTS, CATEGORY_TO_FOLDER; print('OK agents:', list(AGENTS.keys()))"
+python3 -c "from agent_parser import extract_facts; print('OK parser')"
+python3 -c "from agent_classifier import classify; print('OK classifier')"
+python3 -c "from agent_board import read_board; print('OK board')"
+
+echo ""
+echo "INSTALACION COMPLETA"
+echo "Para importar de Apple Notes y procesar: bash sync.sh"
+echo "Para solo procesar staging existente: bash run.sh"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: run.sh
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env bash
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=== nOOxcuro pipeline ==="
+python3 step_parser.py --staging staging
+python3 step_classifier.py
+python3 step_enrich.py
+python3 step_writer.py
+echo "=== Completado ==="
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: step_classifier.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Paso 2 (independiente): classifier.
+
+Lee del tablero los mensajes 'pendiente' dirigidos a 'classifier', clasifica
+el texto, marca ese mensaje como completado, y publica uno nuevo 'pendiente'
+para el paso 'enrich'. No sabe nada del parser ni del writer.
+
+Uso:
+    python3 step_classifier.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+SCRIPT_FOLDER = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_FOLDER)
+
+from agent_classifier import classify
+from agent_board import get_pending, mark_status, post_message
+
+CONFIG_PATH = os.path.join(SCRIPT_FOLDER, "config.json")
+
+
+def load_config() -> dict:
+    with open(os.path.normpath(CONFIG_PATH), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_board_path(config: dict) -> str:
+    vault = os.path.expanduser(config.get("vault_path", ""))
+    board_rel = config.get("board_file", "Meta/agent-messages.md")
+    return os.path.join(vault, board_rel)
+
+
+def main():
+    config = load_config()
+    board_path = get_board_path(config)
+    pendientes = get_pending(board_path, "classifier")
+
+    if not pendientes:
+        print("No hay mensajes pendientes para classifier.")
+        return
+
+    for msg in pendientes:
+        parsed_text = msg["payload"].get("parsed_text", "")
+        raw_text = msg["payload"].get("raw_text", parsed_text) # Usar parsed si raw no está
+        mentions = msg["payload"].get("mentions", [])
+        classification = classify(parsed_text)
+        mark_status(board_path, msg["id"], "completado")
+        next_id = post_message(
+            board_path,
+            step="enrich",
+            note_ref=msg.get("note_ref", ""),
+            payload={
+                "raw_text": raw_text,
+                "parsed_text": parsed_text,
+                "mentions": mentions,
+                "category": classification["category"],
+                "tags": classification["tags"],
+            },
+        )
+        print(f"🏷️  {msg.get('note_ref')} -> categoría: {classification['category']} -> MSG-{next_id} (pendiente para enrich)")
+
+
+if __name__ == "__main__":
+    main()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: step_enrich.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Paso 3 (independiente): enrich.
+
+Lee del tablero los mensajes 'pendiente' dirigidos a 'enrich', llama al
+agente especializado según la categoría (Metodo, Cosmogonia, etc.), marca
+el mensaje como completado, y publica uno nuevo 'pendiente' para 'writer'.
+
+Uso:
+    python3 step_enrich.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+SCRIPT_FOLDER = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_FOLDER)
+sys.path.insert(0, SCRIPT_FOLDER)
+sys.path.insert(0, PROJECT_ROOT)
+
+from agents import AGENTS
+from agent_board import get_pending, mark_status, post_message
+
+CONFIG_PATH = os.path.join(SCRIPT_FOLDER, "config.json")
+
+
+def load_config() -> dict:
+    with open(os.path.normpath(CONFIG_PATH), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_board_path(config: dict) -> str:
+    vault = os.path.expanduser(config.get("vault_path", ""))
+    board_rel = config.get("board_file", "Meta/agent-messages.md")
+    return os.path.join(vault, board_rel)
+
+
+def main():
+    config = load_config()
+    board_path = get_board_path(config)
+    pendientes = get_pending(board_path, "enrich")
+
+    if not pendientes:
+        print("No hay mensajes pendientes para enrich.")
+        return
+
+    for msg in pendientes:
+        category = msg["payload"].get("category", "Metodo")
+        parsed_text = msg["payload"].get("parsed_text", "")
+        raw_text = msg["payload"].get("raw_text", parsed_text)
+        agent_fn = AGENTS.get(category, AGENTS.get("Metodo"))
+        enrichment = agent_fn(parsed_text)
+        mark_status(board_path, msg["id"], "completado")
+        next_id = post_message(
+            board_path,
+            step="writer",
+            note_ref=msg.get("note_ref", ""),
+            payload={
+                "raw_text": raw_text,
+                "category": category,
+                "tags": msg["payload"].get("tags", []),
+                "mentions": msg["payload"].get("mentions", []),
+                "enrichment": enrichment,
+            },
+        )
+        print(f"✨ {msg.get('note_ref')} enriquecida ({category}) -> MSG-{next_id} (pendiente para writer)")
+
+
+if __name__ == "__main__":
+    main()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: step_parser.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Paso 1 (independiente): parser.
+
+Toma un archivo de texto (o todos los .txt de una carpeta de staging),
+extrae hechos, y publica un mensaje 'pendiente' para el paso 'classifier'
+en el tablero (Meta/agent-messages.md). No llama a nada más directamente.
+
+Uso:
+    python3 step_parser.py captura.txt
+    python3 step_parser.py --staging apple_notes_staging/
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+
+SCRIPT_FOLDER = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_FOLDER)
+
+from agent_parser import extract_facts
+from agent_board import post_message
+
+CONFIG_PATH = os.path.join(SCRIPT_FOLDER, "config.json")
+
+
+def load_config() -> dict:
+    with open(os.path.normpath(CONFIG_PATH), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_board_path(config: dict) -> str:
+    vault = os.path.expanduser(config.get("vault_path", ""))
+    board_rel = config.get("board_file", "Meta/agent-messages.md")
+    return os.path.join(vault, board_rel)
+
+
+def procesar_archivo(filepath: str, board_path: str) -> str:
+    with open(filepath, "r", encoding="utf-8") as f:
+        raw_text = f.read().strip()
+    if not raw_text:
+        print(f"⚠️  Vacío, se salta: {filepath}")
+        return ""
+    facts = extract_facts(raw_text)
+    note_ref = os.path.basename(filepath)
+    msg_id = post_message(
+        board_path,
+        step="classifier",
+        note_ref=note_ref,
+        payload={
+            "raw_text": raw_text,
+            "parsed_text": facts["parsed_text"],
+            "mentions": facts["mentions"],
+        },
+    )
+    print(f"📥 {note_ref} -> MSG-{msg_id} (pendiente para classifier)")
+    return msg_id
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("archivo", nargs="?", help="Archivo .txt individual a procesar")
+    ap.add_argument("--staging", help="Carpeta con varios .txt a procesar en lote")
+    ap.add_argument("--mover-a", default="procesadas", help="Subcarpeta donde mover los .txt ya publicados")
+    args = ap.parse_args()
+
+    config = load_config()
+    board_path = get_board_path(config)
+
+    if args.staging:
+        staging = os.path.abspath(args.staging)
+        done_folder = os.path.join(staging, args.mover_a)
+        os.makedirs(done_folder, exist_ok=True)
+        archivos = [f for f in os.listdir(staging) if f.endswith(".txt")]
+        if not archivos:
+            print("No hay .txt pendientes en la carpeta de staging.")
+            return
+        for nombre in archivos:
+            filepath = os.path.join(staging, nombre)
+            msg_id = procesar_archivo(filepath, board_path)
+            if msg_id:
+                os.rename(filepath, os.path.join(done_folder, nombre))
+    elif args.archivo:
+        procesar_archivo(args.archivo, board_path)
+    else:
+        ap.print_help()
+
+
+if __name__ == "__main__":
+    main()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: step_writer.py
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Paso 4 (independiente): writer.
+
+Escribe la nota final .md en 03_nodes/<subcarpeta>/ segun el mapeo de categorias.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import uuid
+from datetime import datetime
+
+SCRIPT_FOLDER = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_FOLDER)
+
+from agent_board import get_pending, mark_status
+from agents import CATEGORY_TO_FOLDER
+
+CONFIG_PATH = os.path.join(SCRIPT_FOLDER, "config.json")
+
+
+def load_config() -> dict:
+    with open(os.path.normpath(CONFIG_PATH), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_vault_path(config: dict) -> str:
+    return os.path.expanduser(config.get("vault_path", ""))
+
+
+def get_board_path(config: dict) -> str:
+    vault = get_vault_path(config)
+    board_rel = config.get("board_file", "Meta/agent-messages.md")
+    return os.path.join(vault, board_rel)
+
+
+def _format_frontmatter_list(items: list[str], is_link: bool = False) -> str:
+    if not items:
+        return "  -"
+    if is_link:
+        unique_items = list(dict.fromkeys(items))
+        return "\n".join(f'  - "[[{item}]]"' for item in unique_items)
+    return "\n".join(f"  - {item}" for item in items)
+
+
+def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
+    now = datetime.utcnow()
+    ts_iso = now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    ts_filename = now.strftime("%Y%m%d%H%M%S")
+    year = now.strftime("%Y")
+    quarter = (now.month - 1) // 3 + 1
+
+    enrichment = msg_payload.get("enrichment", {})
+    category = msg_payload.get("category", "Metodo")
+
+    # Determine subfolder based on category mapping
+    subfolder = CATEGORY_TO_FOLDER.get(category, "thoughts")
+    target_dir = os.path.join(vault_path, nodes_folder, subfolder)
+    os.makedirs(target_dir, exist_ok=True)
+
+    title = enrichment.get("title", "sin-titulo")
+    safe = "".join(c for c in title if c.isalnum() or c in (" ", "-", "_")).rstrip().replace(" ", "-")
+
+    short_uuid = uuid.uuid4().hex[:8]
+    filename = f"{ts_filename}-{safe}.md"
+    filepath = os.path.join(target_dir, filename)
+    while os.path.exists(filepath):
+        short_uuid = uuid.uuid4().hex[:6]
+        filename = f"{ts_filename}-{safe}-{short_uuid}.md"
+        filepath = os.path.join(target_dir, filename)
+
+    parser_mentions = msg_payload.get("mentions", [])
+    agent_entities = enrichment.get("relations_explicit", [])
+    all_explicit_relations = list(dict.fromkeys(parser_mentions + agent_entities))
+
+    fm_tags = _format_frontmatter_list(msg_payload.get("tags", []))
+    fm_relations_explicit = _format_frontmatter_list(all_explicit_relations, is_link=True)
+    fm_relations_semantic = _format_frontmatter_list(enrichment.get("relations_semantic", []))
+    fm_recurrence_topics = _format_frontmatter_list(enrichment.get("recurrence_topics", []))
+
+    citas = enrichment.get("citas", [])
+    preguntas = enrichment.get("preguntas", [])
+
+    frontmatter = f"""---
+id: {ts_filename}
+created_at: {ts_iso}
+source: agente-local
+category: {category}
+core_nucleus: "{enrichment.get('core_nucleus', '')}"
+stage_cognitive: "{enrichment.get('stage_cognitive', '')}"
+tags:
+{fm_tags}
+relations_explicit:
+{fm_relations_explicit}
+relations_semantic:
+{fm_relations_semantic}
+recurrence_topics:
+{fm_recurrence_topics}
+temporal_anchor:
+  period: "{year}-Q{quarter}"
+  mood: ""
+future_letter:
+  enabled: {str(enrichment.get('future_letter', {}).get('enabled', False)).lower()}
+  review_on: {enrichment.get('future_letter', {}).get('review_on') or 'null'}
+---
+# {title}
+## Resumen Ejecutivo
+{enrichment.get('resumen', 'Sin resumen disponible.')}
+## Texto Original
+{enrichment.get('body', msg_payload.get('raw_text', ''))}
+## Citas Clave Detectadas
+{'> ' + '\n> '.join(citas) if citas else '> *No se extrajeron citas relevantes.*'}
+## Lectura posterior
+- Analizar bajo el prisma de la categoria: **{category}**
+## Preguntas persistentes
+{'- ' + '\n- '.join(preguntas) if preguntas else '- *Que implicaciones colaterales tiene este pensamiento?*'}
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(frontmatter)
+    return filepath
+
+
+def main():
+    config = load_config()
+    vault_path = get_vault_path(config)
+    board_path = get_board_path(config)
+    nodes_folder = config.get("nodes_folder", "03_nodes")
+    pendientes = get_pending(board_path, "writer")
+
+    if not pendientes:
+        print("No hay mensajes pendientes para writer.")
+        return
+
+    for msg in pendientes:
+        payload = msg["payload"]
+        category = payload.get("category", "Metodo")
+        subfolder = CATEGORY_TO_FOLDER.get(category, "thoughts")
+        filepath = escribir_nota(vault_path, nodes_folder, payload)
+        mark_status(board_path, msg["id"], "completado")
+        print(f"📝 {msg.get('note_ref')} -> {filepath} (en {subfolder}/)")
+
+
+if __name__ == "__main__":
+    main()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ARCHIVO: sync.sh
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+#!/usr/bin/env bash
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "============================================"
+echo "  nOOxcuro sync — $(date)"
+echo "============================================"
+
+# Check dependencies
+echo ""
+echo "Verificando dependencias..."
+python3 -c "from agents import AGENTS, CATEGORY_TO_FOLDER; print('  OK agents')" || { echo "ERROR: agents.py fallo"; exit 1; }
+python3 -c "from agent_parser import extract_facts; print('  OK parser')" || { echo "ERROR: agent_parser.py fallo"; exit 1; }
+python3 -c "from agent_classifier import classify; print('  OK classifier')" || { echo "ERROR: agent_classifier.py fallo"; exit 1; }
+python3 -c "from agent_board import read_board; print('  OK board')" || { echo "ERROR: agent_board.py fallo"; exit 1; }
+
+# Step 0: Import from Apple Notes
+echo ""
+echo "--- PASO 0: IMPORTAR APPLE NOTES ---"
+python3 arquitecto.py --minutos 60
+
+# Step 1: Parser
+echo ""
+echo "--- PASO 1: PARSER ---"
+python3 step_parser.py --staging staging
+
+# Step 2: Classifier
+echo ""
+echo "--- PASO 2: CLASSIFIER ---"
+python3 step_classifier.py
+
+# Step 3: Enrich
+echo ""
+echo "--- PASO 3: ENRICH ---"
+python3 step_enrich.py
+
+# Step 4: Writer
+echo ""
+echo "--- PASO 4: WRITER ---"
+python3 step_writer.py
+
+echo ""
+echo "============================================"
+echo "  Sync completado — $(date)"
+echo "============================================"
+
+
+═══════════════════════════════════════════════════════════════════════════════
