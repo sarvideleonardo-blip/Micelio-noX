@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+staging/
+03_nodes/
+Meta/
+logs/sync_manifest.json
+.sync_manifest.json
+.vscode/
