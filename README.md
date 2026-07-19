@@ -1,151 +1,80 @@
-# noXcuro - Sistema de Micelio Cognitivo
+# nOOxcuro Pipeline v3.0 — Estructura Final
 
-**Arqueología + Proyección del pensamiento**
+## Que es
 
-noXcuro es una infraestructura para observar cómo muta el pensamiento a lo largo del tiempo. No busca fijar el "yo", sino ver cómo se transforma, se contradice, se disuelve y reaparece en distintas formas.
+Pipeline que transforma notas de Apple Notes (o archivos .txt) en notas estructuradas de Obsidian, organizadas en la estructura definitiva del protocolo.
 
-## ¿Qué es?
+## Estructura de salida
 
-- **No es un organizador de notas**
-- **No es una app de productividad**
-- **No es un archivo para preservar identidad**
+```
+nOOxcuro/
+├── 01_project/
+├── 02_logs_ia/
+└── 03_nodes/
+    ├── thoughts/      ← Cosmogonia, Identidad
+    ├── doubts/        ← Leyes
+    ├── ideas/         ← Metodo, Museo
+    └── conversations/ ← Escritura
+```
 
-Es un sistema que permite:
+## Archivos
 
-- ✨ **Capturar pensamiento sin fricción**
-- 🕸️ **Detectar patrones recurrentes** que atraviesan años
-- 🔄 **Ver cómo una misma esencia cambia de forma**
-- 💬 **Conversar con versiones pasadas** sin romantizarlas
-- 📮 **Enviar mensajes conscientes al futuro**
-- 🌌 **Navegar la escritura como un campo de fuerzas**, no como carpetas
+| Archivo | Que hace |
+|---------|----------|
+| `arquitecto.py` | Importer: saca notas de Apple Notes (SQLite) → staging/ |
+| `step_parser.py` | Paso 1: lee .txt de staging, publica en tablero |
+| `step_classifier.py` | Paso 2: clasifica en 6 categorias |
+| `step_enrich.py` | Paso 3: enriquece con agente especializado |
+| `step_writer.py` | Paso 4: escribe .md en 03_nodes/<subcarpeta>/ |
+| `agent_parser.py` | Limpia texto, extrae hechos, resumen, citas |
+| `agent_classifier.py` | Clasifica: Metodo/Cosmogonia/Museo/Escritura/Identidad/Leyes |
+| `agent_*.py` (6) | Agentes especializados por categoria |
+| `agent_board.py` | Tablero de mensajes async (markdown) |
+| `agents.py` | Registro de agentes + mapeo a 03_nodes/ |
+| `config.json` | Configuracion central |
+| `sync.sh` | **Comando unico**: importer + pipeline completo |
+| `run.sh` | Solo pipeline (si staging ya tiene .txt) |
+| `install.sh` | Instalador: crea carpetas, configura paths |
 
-## Características Principales
-
-### 1. **Captura Sin Fricción**
-Escribe fragmentos, poemas, observaciones, paradojas. El sistema detecta automáticamente:
-- Categoría temática
-- Tags relevantes
-- Núcleo semántico central
-- Conexiones con textos previos
-
-### 2. **Micelio Radial**
-Un grafo interactivo donde:
-- Cada nodo representa un texto
-- Las líneas muestran conexiones semánticas
-- Puedes hacer zoom en cualquier punto
-- Se resaltan densidades temáticas
-- No hay carpetas rígidas
-
-### 3. **Conversación Intertemporal**
-Selecciona cualquier nodo y conversa con esa versión de ti:
-- "¿Qué era central en ese momento?"
-- "¿Cómo evolucionó esta idea?"
-- "¿Qué cambió entre entonces y ahora?"
-
-No como nostalgia. Como **contraste estructural**.
-
-### 4. **Carrusel Visual**
-Exporta tus textos como slides optimizados con:
-- Múltiples tipografías (sans, serif, modern, classic)
-- Fondos personalizados
-- División automática en fragmentos semánticos
-- Descarga como imágenes
-
-## Instalación
+## Instalacion
 
 ```bash
-# Clonar
-git clone https://github.com/sarvideleonardo-blip/Micelio-noX.git
-cd Micelio-noX
-
-# Instalar dependencias
-npm install
-
-# Correr en desarrollo
-npm run dev
-
-# Buildear para producción
-npm run build
+bash install.sh "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/nOOxcuro"
 ```
 
-## Uso Rápido
+## Uso diario
 
-1. **Abre** la app en `http://localhost:5173`
-2. **Escribe** un pensamiento en la sección "Captura"
-3. **Haz clic** en "Guardar al Micelio"
-4. **Explora** el grafo interactivo
-5. **Selecciona** un nodo para conversar
-6. **Exporta** a carrusel visual
+```bash
+# Todo en uno: Apple Notes → Obsidian
+bash sync.sh
 
-## Estructura del Proyecto
-
-```
-src/
-├── App.jsx              # Componente principal
-├── main.jsx             # Punto de entrada React
-└── index.css            # Estilos globales (Tailwind)
-vite.config.js          # Configuración Vite
-tailwind.config.js      # Configuración Tailwind
-package.json            # Dependencias
+# O solo pipeline (si ya tienes .txt en staging/)
+bash run.sh
 ```
 
-## Categorías de Nodos
+## Mapeo de categorias
 
-- **Método** - Procesos, formas de hacer
-- **Cosmogonía** - Tiempo, origen, estructura del universo
-- **Museo** - Memorialización, preservación
-- **Escritura** - Lenguaje, forma, expresión
-- **Identidad** - Ser, transformación del yo
-- **Leyes** - Patrones, reglas recurrentes
+| Categoria | 03_nodes/ |
+|-----------|-----------|
+| Cosmogonia | thoughts |
+| Identidad | thoughts |
+| Museo | ideas |
+| Escritura | conversations |
+| Metodo | ideas |
+| Leyes | doubts |
 
-## Tecnología
+## Requisitos
 
-- **React 18** - UI interactivo
-- **Vite** - Build tool rápido
-- **Tailwind CSS** - Estilos
-- **Lucide React** - Iconografía
-- **Fonts**: Inter (sans) + Merriweather (serif)
+- Python 3.8+
+- `html2text` (solo para importer): `pip3 install html2text`
+- Todo lo demas es libreria estandar
 
-## Filosofía
+## Flujo
 
-> No encontrar respuestas definitivas.
-> No definir la esencia.
->
-> Sino:
-> - Observar la persistencia de ciertas preguntas
-> - Ver cómo cambian de forma
-> - Detectar patrones invisibles
-> - Permitir que emerjan conexiones inesperadas
->
-> Lo interesante no es entenderlo todo.
-> Es construir el espacio donde algo inesperado pueda aparecer.
-
-## Roadmap
-
-- [ ] Persistencia en base de datos (Supabase)
-- [ ] Exportar timeline completo
-- [ ] Búsqueda semántica avanzada
-- [ ] Integración con Obsidian
-- [ ] Cartas al futuro con recordatorios
-- [ ] Análisis de mutaciones (gráficos de evolución)
-- [ ] Colaboración multiusuario
-
-## Licencia
-
-MIT
-
----
-
-**Resultado imaginado:**
-
-Una app privada donde:
-- Veo un micelio central
-- Puedo tocar cualquier nodo
-- Puedo saltar entre años
-- Puedo ver mutaciones de una misma idea
-- Puedo conversar con distintas versiones mías
-- Puedo dejar mensajes hacia adelante
-- Puedo perderme navegando conexiones sin saber qué voy a encontrar
-
-**No es control.**
-**Es exploración estructurada del caos.**
+```
+Apple Notes ──► arquitecto.py ──► staging/*.txt
+                                      │
+staging/*.txt ──► step_parser ──► tablero ──► step_classifier ──► step_enrich ──► step_writer
+                                                                                    │
+                                                                                    ▼
+                                                                           03_nodes/<subcarpeta>/*.md
