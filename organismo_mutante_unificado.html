@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organismo Mutante Unificado - Cordyceps Lingua 3D & 2D</title>
+  <style>
+    :root {
+      --bg-color: #020204;
+      --panel-bg: rgba(6, 6, 10, 0.88);
+      --border-color: rgba(255, 46, 99, 0.28);
+      --text-color: #f3f4f6;
+      --muted-color: #9ca3af;
+      --accent-pink: #ff2e63;
+      --accent-cyan: #08d9d6;
+      --accent-gold: #d4af37;
+      --accent-purple: #9d4edd;
+      --font-main: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-title: "Syne", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(157, 78, 221, 0.20), transparent 32%),
+        radial-gradient(circle at 80% 12%, rgba(8, 217, 214, 0.14), transparent 30%),
+        radial-gradient(circle at 50% 90%, rgba(255, 46, 99, 0.15), transparent 34%),
+        var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-main);
+    }
+
+    #topbar {
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 60px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 20px;
+      background: rgba(6, 6, 12, 0.90);
+      border-bottom: 1px solid var(--border-color);
+      backdrop-filter: blur(15px);
+    }
+
+    .brand-title {
+      font-family: var(--font-title);
+      font-size: clamp(0.95rem, 2vw, 1.25rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .brand-title span { color: var(--accent-pink); text-shadow: 0 0 14px var(--accent-pink); }
+
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+    button, select, textarea {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-color);
+      border-radius: 999px;
+      font: inherit;
+    }
+
+    button, select { min-height: 36px; padding: 8px 12px; cursor: pointer; }
+    button:hover, select:hover { border-color: var(--accent-cyan); box-shadow: 0 0 16px rgba(8, 217, 214, 0.18); }
+    button.active { background: linear-gradient(135deg, rgba(255, 46, 99, 0.55), rgba(157, 78, 221, 0.45)); border-color: var(--accent-pink); }
+    button.primary { background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple)); border-color: transparent; font-weight: 700; }
+
+    #stage { position: fixed; inset: 60px 0 0 0; display: grid; grid-template-columns: 1fr minmax(280px, 360px); }
+    #cosmos, #map2d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #map2d { opacity: 0; pointer-events: none; transition: opacity 220ms ease; }
+    body[data-view="2d"] #map2d { opacity: 1; pointer-events: auto; }
+    body[data-view="2d"] #cosmos { opacity: 0.16; }
+
+    #sidepanel {
+      position: relative;
+      z-index: 10;
+      grid-column: 2;
+      align-self: stretch;
+      margin: 16px;
+      padding: 18px;
+      overflow: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      background: var(--panel-bg);
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(18px);
+    }
+
+    h2 { font-family: var(--font-title); margin-bottom: 10px; letter-spacing: 0.04em; }
+    .stat { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--muted-color); }
+    .stat strong { color: var(--accent-cyan); }
+    .phase-name { color: var(--accent-gold); font-weight: 800; }
+    textarea { width: 100%; min-height: 150px; resize: vertical; border-radius: 18px; padding: 12px; margin: 12px 0; line-height: 1.45; background: rgba(0,0,0,0.32); }
+    .word-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .word-chip { padding: 5px 8px; border-radius: 999px; background: rgba(8,217,214,0.10); border: 1px solid rgba(8,217,214,0.22); font-size: 0.82rem; }
+    .hint { color: var(--muted-color); font-size: 0.86rem; line-height: 1.45; margin-top: 12px; }
+
+    #toast { position: fixed; left: 20px; bottom: 20px; z-index: 30; padding: 12px 14px; border-radius: 16px; background: rgba(2,2,4,0.86); border: 1px solid var(--border-color); color: var(--accent-cyan); opacity: 0; transform: translateY(12px); transition: 180ms ease; }
+    #toast.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 900px) {
+      #topbar { height: auto; min-height: 60px; align-items: flex-start; flex-direction: column; padding: 10px 12px; }
+      #stage { inset-top: 116px; grid-template-columns: 1fr; }
+      #sidepanel { grid-column: 1; align-self: end; max-height: 42vh; }
+    }
+  </style>
+</head>
+<body data-view="3d">
+  <header id="topbar">
+    <div class="brand-title">Cordyceps <span>Lingua</span> / Organismo Mutante</div>
+    <nav class="toolbar" aria-label="Controles del organismo">
+      <button id="view3d" class="active">🌌 3D</button>
+      <button id="view2d">🗺️ 2D</button>
+      <select id="phaseSelect" aria-label="Fase evolutiva">
+        <option value="0">I · Normal</option>
+        <option value="1">II · Caos Glitch</option>
+        <option value="2">III · Enana Blanca</option>
+        <option value="3">IV · Agujero Negro</option>
+        <option value="4">V · Criaturas Fractales</option>
+      </select>
+      <button id="mutateBtn">🧬 Mutar Ahora</button>
+      <button id="growthBtn">🌱 Autocrecimiento</button>
+      <button id="exportBtn">⬇️ Genoma JSON</button>
+    </nav>
+  </header>
+
+  <main id="stage">
+    <canvas id="cosmos"></canvas>
+    <canvas id="map2d"></canvas>
+    <aside id="sidepanel">
+      <h2>Biomasa lingüística</h2>
+      <div class="stat"><span>Fase activa</span><strong id="phaseName" class="phase-name">I · Normal</strong></div>
+      <div class="stat"><span>Esporas</span><strong id="wordCount">0</strong></div>
+      <div class="stat"><span>Mutaciones</span><strong id="mutationCount">0</strong></div>
+      <div class="stat"><span>Autocrecimiento</span><strong id="growthState">Inactivo</strong></div>
+      <textarea id="inputText" placeholder="Pega un poema, bitácora o texto para infectarlo con el Cordyceps Lingua..."></textarea>
+      <button id="ingestBtn" class="primary">🌱 Ingerir texto</button>
+      <button id="resetBtn">↺ Reiniciar organismo</button>
+      <p class="hint">La distribución 3D usa una esfera Fibonacci para evitar columnas de palabras y conservar separación uniforme al crecer.</p>
+      <div id="wordList" class="word-list" aria-live="polite"></div>
+    </aside>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const STORAGE_KEY = 'cordyceps-lingua-genome-v1';
+    const RADIUS = 180;
+    const GLITCH_CHARS = '░▒▓█∆∇◇◆◎◉⟁⌁⌬⍟λψЖ҉';
+    const PHASES = ['I · Normal', 'II · Caos Glitch', 'III · Enana Blanca', 'IV · Agujero Negro', 'V · Criaturas Fractales'];
+    const DEFAULT_TEXT = 'Sembrar lengua espora bioluminiscente hifa mapa tierra cosmos colapso enana blanca agujero negro dragón código planeta caníbal mutación memoria organismo';
+
+    const state = loadGenome();
+    let phase = 0;
+    let growthTimer = null;
+    let time = 0;
+
+    const cosmos = document.getElementById('cosmos');
+    const map2d = document.getElementById('map2d');
+    const ctx = cosmos.getContext('2d');
+    const mapCtx = map2d.getContext('2d');
+
+    function loadGenome() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved?.words?.length) return saved;
+      } catch (_error) {}
+      return { words: tokenize(DEFAULT_TEXT), mutations: 0, createdAt: new Date().toISOString() };
+    }
+
+    function saveGenome() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function tokenize(text) { return [...new Set(text.toUpperCase().normalize('NFC').match(/[A-ZÁÉÍÓÚÜÑ]{3,}/g) || [])]; }
+
+    function fibonacciPoint(index, total) {
+      if (total <= 1) return { x: 0, y: 0, z: RADIUS };
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const yUnit = 1 - (index / (total - 1)) * 2;
+      const radial = Math.sqrt(Math.max(0, 1 - yUnit * yUnit));
+      const theta = 2 * Math.PI * index / phi;
+      return { x: radial * Math.cos(theta) * RADIUS, y: yUnit * RADIUS, z: radial * Math.sin(theta) * RADIUS };
+    }
+
+    function pointFor(index, total) {
+      const base = fibonacciPoint(index, total);
+      const wobble = phase >= 1 ? Math.sin(time * 0.06 + index * 1.7) * 9 : 0;
+      const collapse = phase === 2 ? 0.32 + 0.08 * Math.sin(time * 0.04) : phase === 3 ? 0.16 : 1;
+      const creature = phase === 4 ? 1 + 0.25 * Math.sin(index * 0.4 + time * 0.045) : 1;
+      return { x: (base.x + wobble) * collapse * creature, y: (base.y + wobble * 0.55) * collapse, z: (base.z - wobble) * collapse * creature };
+    }
+
+    function project(point) {
+      const w = cosmos.width / devicePixelRatio;
+      const h = cosmos.height / devicePixelRatio;
+      const camera = 520;
+      const z = point.z + 300;
+      const scale = camera / (camera + z);
+      return { x: w / 2 + point.x * scale, y: h / 2 + point.y * scale, scale };
+    }
+
+    function drawCosmos() {
+      time += 1;
+      const w = cosmos.width / devicePixelRatio;
+      const h = cosmos.height / devicePixelRatio;
+      ctx.clearRect(0, 0, w, h);
+      drawStars(w, h);
+      drawCore(w, h);
+
+      const points = state.words.map((_, i) => project(pointFor(i, state.words.length)));
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const q = points[(i + 1) % points.length];
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+      });
+      ctx.strokeStyle = phase >= 3 ? 'rgba(212,175,55,0.35)' : 'rgba(255,46,99,0.32)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      points.forEach((p, i) => drawSpore(p, state.words[i], i));
+      if (phase >= 3) drawPolarJets(w, h);
+      if (phase === 4) drawCreatures(w, h);
+      requestAnimationFrame(drawCosmos);
+    }
+
+    function drawStars(w, h) {
+      ctx.fillStyle = 'rgba(255,255,255,0.52)';
+      for (let i = 0; i < 90; i += 1) {
+        const x = (Math.sin(i * 97.13) * 0.5 + 0.5) * w;
+        const y = (Math.cos(i * 43.71) * 0.5 + 0.5) * h;
+        ctx.globalAlpha = 0.25 + 0.5 * Math.sin(time * 0.015 + i);
+        ctx.fillRect(x, y, 1.2, 1.2);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawCore(w, h) {
+      const gradient = ctx.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, phase >= 3 ? 96 : 180);
+      gradient.addColorStop(0, phase >= 3 ? '#000' : 'rgba(8,217,214,0.18)');
+      gradient.addColorStop(0.45, phase >= 3 ? 'rgba(255,46,99,0.62)' : 'rgba(157,78,221,0.10)');
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, phase >= 3 ? 100 : 190, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawSpore(p, word, index) {
+      const glitched = phase >= 1 && index % 5 === 0 ? mutateGlyph(word) : word;
+      const size = Math.max(2, 4.5 * p.scale);
+      ctx.fillStyle = phase === 2 ? '#f3f4f6' : phase >= 3 ? '#d4af37' : index % 2 ? '#08d9d6' : '#ff2e63';
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (p.scale > 0.56 || index % 3 === 0) {
+        ctx.font = `${Math.max(9, 13 * p.scale)}px var(--font-main)`;
+        ctx.fillText(glitched, p.x + 7, p.y - 7);
+      }
+    }
+
+    function mutateGlyph(word) { return word.split('').map((char, i) => i % 3 ? char : GLITCH_CHARS[(time + i + word.length) % GLITCH_CHARS.length]).join(''); }
+
+    function drawPolarJets(w, h) {
+      ctx.strokeStyle = 'rgba(8,217,214,0.56)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 38; i += 1) {
+        const offset = Math.sin(time * 0.06 + i) * 38;
+        ctx.moveTo(w / 2 + offset, h / 2 - 40);
+        ctx.lineTo(w / 2 + offset * 0.35, 20 + i * 2);
+        ctx.moveTo(w / 2 - offset, h / 2 + 40);
+        ctx.lineTo(w / 2 - offset * 0.35, h - 20 - i * 2);
+      }
+      ctx.stroke();
+    }
+
+    function drawCreatures(w, h) {
+      ctx.strokeStyle = 'rgba(157,78,221,0.8)';
+      ctx.lineWidth = 3;
+      for (let dragon = 0; dragon < 3; dragon += 1) {
+        ctx.beginPath();
+        for (let i = 0; i < 44; i += 1) {
+          const a = time * 0.025 + i * 0.28 + dragon * 2.2;
+          const x = w / 2 + Math.cos(a) * (150 + dragon * 36) + i * 2 - 42;
+          const y = h / 2 + Math.sin(a * 1.3) * (80 + dragon * 18);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    function drawMap() {
+      const w = map2d.width / devicePixelRatio;
+      const h = map2d.height / devicePixelRatio;
+      mapCtx.clearRect(0, 0, w, h);
+      mapCtx.fillStyle = '#050508';
+      mapCtx.fillRect(0, 0, w, h);
+      mapCtx.strokeStyle = 'rgba(8,217,214,0.12)';
+      mapCtx.lineWidth = 1;
+      for (let lon = -180; lon <= 180; lon += 30) {
+        const x = ((lon + 180) / 360) * w;
+        mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, h); mapCtx.stroke();
+      }
+      for (let lat = -90; lat <= 90; lat += 15) {
+        const y = ((90 - lat) / 180) * h;
+        mapCtx.beginPath(); mapCtx.moveTo(0, y); mapCtx.lineTo(w, y); mapCtx.stroke();
+      }
+      const coords = state.words.map((word, i) => wordToGeo(word, i, w, h));
+      mapCtx.beginPath();
+      coords.forEach((p, i) => { if (i === 0) mapCtx.moveTo(p.x, p.y); else mapCtx.lineTo(p.x, p.y); });
+      mapCtx.strokeStyle = 'rgba(255,46,99,0.5)'; mapCtx.lineWidth = 1.5; mapCtx.stroke();
+      coords.forEach((p, i) => {
+        mapCtx.fillStyle = i % 2 ? '#08d9d6' : '#ff2e63';
+        mapCtx.beginPath(); mapCtx.arc(p.x, p.y, 4, 0, Math.PI * 2); mapCtx.fill();
+        if (i % 4 === 0) mapCtx.fillText(state.words[i], p.x + 7, p.y - 5);
+      });
+      requestAnimationFrame(drawMap);
+    }
+
+    function wordToGeo(word, index, w, h) {
+      const hash = [...word].reduce((acc, char) => acc + char.charCodeAt(0) * 17, index * 23);
+      const lon = ((hash * 37) % 360) - 180;
+      const lat = ((hash * 19) % 160) - 80;
+      return { x: ((lon + 180) / 360) * w, y: ((90 - lat) / 180) * h };
+    }
+
+    function mutateNow() {
+      if (state.words.length < 2) return;
+      const a = state.words[Math.floor(Math.random() * state.words.length)];
+      const b = state.words[Math.floor(Math.random() * state.words.length)];
+      const child = (a.slice(0, Math.ceil(a.length / 2)) + b.slice(Math.floor(b.length / 2))).slice(0, 16);
+      if (!state.words.includes(child)) state.words.push(child);
+      state.mutations += 1;
+      persistAndRender(`Mutación germinada: ${child}`);
+    }
+
+    function persistAndRender(message) { saveGenome(); renderPanel(); toast(message); }
+    function toast(message) { const el = document.getElementById('toast'); el.textContent = message; el.classList.add('visible'); setTimeout(() => el.classList.remove('visible'), 2200); }
+
+    function renderPanel() {
+      document.getElementById('phaseName').textContent = PHASES[phase];
+      document.getElementById('wordCount').textContent = state.words.length;
+      document.getElementById('mutationCount').textContent = state.mutations;
+      document.getElementById('growthState').textContent = growthTimer ? 'Activo' : 'Inactivo';
+      document.getElementById('wordList').innerHTML = state.words.slice(-36).map(word => `<span class="word-chip">${word}</span>`).join('');
+    }
+
+    function resize() {
+      [cosmos, map2d].forEach(canvas => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * devicePixelRatio;
+        canvas.height = rect.height * devicePixelRatio;
+        canvas.getContext('2d').setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      });
+    }
+
+    document.getElementById('phaseSelect').addEventListener('change', (event) => { phase = Number(event.target.value); renderPanel(); });
+    document.getElementById('mutateBtn').addEventListener('click', mutateNow);
+    document.getElementById('growthBtn').addEventListener('click', () => {
+      if (growthTimer) { clearInterval(growthTimer); growthTimer = null; } else { growthTimer = setInterval(mutateNow, 3200); }
+      renderPanel();
+    });
+    document.getElementById('ingestBtn').addEventListener('click', () => {
+      const incoming = tokenize(document.getElementById('inputText').value);
+      state.words = [...new Set([...state.words, ...incoming])];
+      document.getElementById('inputText').value = '';
+      persistAndRender(`Texto ingerido: ${incoming.length} esporas detectadas`);
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => { state.words = tokenize(DEFAULT_TEXT); state.mutations = 0; persistAndRender('Organismo reiniciado'); });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement('a'), { href: url, download: 'cordyceps-lingua-genoma.json' });
+      link.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('view3d').addEventListener('click', () => { document.body.dataset.view = '3d'; document.getElementById('view3d').classList.add('active'); document.getElementById('view2d').classList.remove('active'); });
+    document.getElementById('view2d').addEventListener('click', () => { document.body.dataset.view = '2d'; document.getElementById('view2d').classList.add('active'); document.getElementById('view3d').classList.remove('active'); });
+
+    window.addEventListener('resize', resize);
+    resize(); renderPanel(); drawCosmos(); drawMap();
+  </script>
+</body>
+</html>
