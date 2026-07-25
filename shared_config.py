@@ -21,11 +21,17 @@ def load_config() -> dict:
 
 
 def get_board_path(config: dict | None = None) -> str:
-    """Resolve the board file path from config."""
+    """Resolve the board file path from config.
+
+    board_file puede ser una ruta absoluta (vive fuera del vault, ej. en el
+    repo del pipeline) o relativa al vault (comportamiento anterior).
+    """
     if config is None:
         config = load_config()
+    board_rel = os.path.expanduser(config.get("board_file", "Meta/agent-messages.md"))
+    if os.path.isabs(board_rel):
+        return board_rel
     vault = os.path.expanduser(config.get("vault_path", ""))
-    board_rel = config.get("board_file", "Meta/agent-messages.md")
     return os.path.join(vault, board_rel)
 
 
