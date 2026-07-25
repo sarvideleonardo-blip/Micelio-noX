@@ -66,6 +66,8 @@ def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
 
     citas = enrichment.get("citas", [])
     preguntas = enrichment.get("preguntas", [])
+    citas_bloque = ("> " + "\n> ".join(citas)) if citas else "> *No se extrajeron citas relevantes.*"
+    preguntas_bloque = ("- " + "\n- ".join(preguntas)) if preguntas else "- *Que implicaciones colaterales tiene este pensamiento?*"
 
     frontmatter = f"""---
 id: {ts_filename}
@@ -95,11 +97,11 @@ future_letter:
 ## Texto Original
 {enrichment.get('body', msg_payload.get('raw_text', ''))}
 ## Citas Clave Detectadas
-{'> ' + '\n> '.join(citas) if citas else '> *No se extrajeron citas relevantes.*'}
+{citas_bloque}
 ## Lectura posterior
 - Analizar bajo el prisma de la categoria: **{category}**
 ## Preguntas persistentes
-{'- ' + '\n- '.join(preguntas) if preguntas else '- *Que implicaciones colaterales tiene este pensamiento?*'}
+{preguntas_bloque}
 """
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(frontmatter)
