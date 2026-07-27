@@ -78,3 +78,34 @@ staging/*.txt ──► step_parser ──► tablero ──► step_classifier 
                                                                                     │
                                                                                     ▼
                                                                            03_nodes/<subcarpeta>/*.md
+```
+
+## Abrir Cordyceps Lingua en local
+
+**Desde la raíz del repo** significa estar parado en la carpeta principal del proyecto, donde viven archivos como `package.json`, `index.html` y la carpeta `src/`. En este entorno esa carpeta es:
+
+```bash
+/workspace/Micelio-noX
+```
+
+Para entrar manualmente a esa carpeta y abrir la app:
+
+```bash
+cd /workspace/Micelio-noX
+npm install
+npm run dev -- --host 127.0.0.1
+```
+
+Cuando Vite arranque, abre esta dirección en el navegador:
+
+```text
+http://localhost:5173
+```
+
+Si `localhost` no responde, usa la dirección equivalente que Vite imprime en la terminal:
+
+```text
+http://127.0.0.1:5173/
+```
+
+La entrada visual actual del navegador es **Cordyceps Lingua - Organismo Mutante 3D/2D**.
