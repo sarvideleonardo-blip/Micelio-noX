@@ -21,11 +21,15 @@ AGENTS: dict[str, callable] = {
 }
 
 # Mapeo a estructura 03_nodes/
+# Nota: este mapeo se mantiene como fallback histórico, pero **step_writer.py ya no
+# determina la ruta por categoría**. Ahora todo migración de Apple Notes va a
+# 05_ESCRITURA/finales/, salvo que el enriquecedor marque explícitamente el caso
+# como teoría (los agentes devuelven dict; la ruta real se setea en step_writer).
 CATEGORY_TO_FOLDER: dict[str, str] = {
-    "Cosmogonia": "04_PENSARES/reflexiones",
-    "Identidad": "04_PENSARES/reflexiones",
+    "Cosmogonia": "04_PENSARES/teorias",
+    "Identidad": "04_PENSARES/teorias",
     "Museo": "06_PROYECTOS/activos",
-    "Escritura": "05_ESCRITURA/conversaciones",
+    "Escritura": "05_ESCRITURA/finales",
     "Metodo": "06_PROYECTOS/activos",
-    "Leyes": "04_PENSARES/preguntas",
+    "Leyes": "04_PENSARES/teorias",
 }

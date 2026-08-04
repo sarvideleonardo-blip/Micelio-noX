@@ -20,13 +20,11 @@ from agents import CATEGORY_TO_FOLDER
 from shared_config import load_config, get_board_path, get_vault_path
 
 
-def _format_frontmatter_list(items: list[str], is_link: bool = False) -> str:
+def _format_frontmatter_list(items: list[str]) -> str:
     if not items:
-        return "  -"
-    if is_link:
-        unique_items = list(dict.fromkeys(items))
-        return "\n".join(f'  - "[[{item}]]"' for item in unique_items)
-    return "\n".join(f"  - {item}" for item in items)
+        return "  []"
+    unique_items = list(dict.fromkeys(items))
+    return "  [" + ", ".join(f'"{item}"' for item in unique_items) + "]"
 
 
 def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
@@ -39,9 +37,13 @@ def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
     enrichment = msg_payload.get("enrichment", {})
     category = msg_payload.get("category", "Metodo")
 
-    # Determine subfolder based on category mapping
-    subfolder = CATEGORY_TO_FOLDER.get(category, "thoughts")
-    target_dir = os.path.join(vault_path, nodes_folder, subfolder)
+    # Destino por defecto para migración Apple Notes: 05_ESCRITURA/finales
+    # Solo se desvía si el enriquecedor marca explícitamente teoría/tratado extenso.
+    es_teoria = bool(enrichment.get("es_teoria", False))
+    if es_teoria:
+        target_dir = os.path.join(vault_path, nodes_folder, "04_PENSARES/teorias")
+    else:
+        target_dir = os.path.join(vault_path, nodes_folder, "05_ESCRITURA/finales")
     os.makedirs(target_dir, exist_ok=True)
 
     title = enrichment.get("title", "sin-titulo")
@@ -55,14 +57,27 @@ def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
         filename = f"{ts_filename}-{safe}-{short_uuid}.md"
         filepath = os.path.join(target_dir, filename)
 
-    parser_mentions = msg_payload.get("mentions", [])
-    agent_entities = enrichment.get("relations_explicit", [])
-    all_explicit_relations = list(dict.fromkeys(parser_mentions + agent_entities))
+    # Nuevo esquema YAML (fecha / etapa / categoria / tags / nucleo / conexiones / tipo / estado / universo)
+    now_date = now.strftime("%Y-%m-%d")
+    etapa = enrichment.get("stage_cognitive", "404")
 
-    fm_tags = _format_frontmatter_list(msg_payload.get("tags", []))
-    fm_relations_explicit = _format_frontmatter_list(all_explicit_relations, is_link=True)
-    fm_relations_semantic = _format_frontmatter_list(enrichment.get("relations_semantic", []))
-    fm_recurrence_topics = _format_frontmatter_list(enrichment.get("recurrence_topics", []))
+    nucleo = enrichment.get("core_nucleus", "") or ""
+
+    # Conexiones: parser_mentions + relations_explicit + relations_semantic
+    relations_explicit = enrichment.get("relations_explicit", [])
+    relations_semantic = enrichment.get("relations_semantic", [])
+    conexiones = list(dict.fromkeys(parser_mentions + relations_explicit + relations_semantic))
+
+    tags = msg_payload.get("tags", []) or []
+    universo = enrichment.get("universo", []) or []
+
+    tipo = enrichment.get("tipo", "fragmento") or "fragmento"
+    estado_bruto = enrichment.get("future_letter", {})
+    estado = "borrador" if estado_bruto.get("enabled") else "final"
+
+    fm_tags = _format_frontmatter_list(tags)
+    fm_conexiones = _format_frontmatter_list(conexiones)
+    fm_universo = _format_frontmatter_list(universo)
 
     citas = enrichment.get("citas", [])
     preguntas = enrichment.get("preguntas", [])
@@ -70,26 +85,18 @@ def escribir_nota(vault_path: str, nodes_folder: str, msg_payload: dict) -> str:
     preguntas_bloque = ("- " + "\n- ".join(preguntas)) if preguntas else "- *Que implicaciones colaterales tiene este pensamiento?*"
 
     frontmatter = f"""---
-id: {ts_filename}
-created_at: {ts_iso}
-source: agente-local
-category: {category}
-core_nucleus: "{enrichment.get('core_nucleus', '')}"
-stage_cognitive: "{enrichment.get('stage_cognitive', '')}"
+fecha: {now_date}
+etapa: {etapa}
+categoria: {category}
 tags:
 {fm_tags}
-relations_explicit:
-{fm_relations_explicit}
-relations_semantic:
-{fm_relations_semantic}
-recurrence_topics:
-{fm_recurrence_topics}
-temporal_anchor:
-  period: "{year}-Q{quarter}"
-  mood: ""
-future_letter:
-  enabled: {str(enrichment.get('future_letter', {}).get('enabled', False)).lower()}
-  review_on: {enrichment.get('future_letter', {}).get('review_on') or 'null'}
+nucleo: "{nucleo}"
+conexiones:
+{fm_conexiones}
+tipo: {tipo}
+estado: {estado}
+universo:
+{fm_universo}
 ---
 # {title}
 ## Resumen Ejecutivo

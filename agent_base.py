@@ -66,6 +66,8 @@ def make_agent_enrich(
             "resumen": resumen,
             "citas": citas,
             "preguntas": preguntas_detectadas,
+            "tipo": "fragmento",
+            "universo": [],
         }
 
     return enrich

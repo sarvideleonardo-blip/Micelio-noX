@@ -40,6 +40,13 @@ def main():
         raw_text = msg["payload"].get("raw_text", parsed_text)
         agent_fn = AGENTS.get(category, AGENTS.get("Metodo"))
         enrichment = agent_fn(parsed_text)
+
+        # Marcar si es teoría/tratado extenso para derivar la ruta de salida
+        if (category or "").strip().lower() in {"cosmogonia", "identidad", "leyes"}:
+            enrichment["es_teoria"] = True
+        else:
+            enrichment["es_teoria"] = False
+
         mark_status(board_path, msg["id"], "completado")
         next_id = post_message(
             board_path,
